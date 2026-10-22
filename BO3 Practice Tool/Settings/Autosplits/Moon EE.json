@@ -1,0 +1,21 @@
+{
+    "Settings": {
+        "In Game Timer": true,
+        "In Game Round Timer": false,
+        "Amount of Splits": 5,
+        "Map Index": 12,
+        "Split Type": 0,
+        "Split Index 0": 1,
+        "Split Index 1": 2,
+        "Split Index 2": 3,
+        "Split Index 3": 4,
+        "Split Index 4": 5
+    },
+    "Split Data": {
+        "Samantha Says": -1,
+        "Terminals": -1,
+        "Vril Sphere": -1,
+        "Canister #1": -1,
+        "Canister #2": -1
+    }
+}

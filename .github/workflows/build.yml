@@ -1,0 +1,51 @@
+# Builds the Practice Tool on a clean Windows machine on every push:
+#   1. compiles the GSC mod (fails the build on any script syntax error)
+#   2. builds BO3 Practice Tool.exe (Release x64)
+#   3. uploads a ready-to-run zip under the run's "Artifacts"
+name: Build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile GSC mod
+        shell: cmd
+        working-directory: GSC/Practice Tool - Release Version
+        run: |
+          ..\..\Compiler\DebugCompiler.exe --compile --noupdate
+          if errorlevel 1 exit /b 1
+          if not exist compiled.gsic exit /b 1
+          copy /y compiled.gsic "..\..\Compiler\Practice Tool.gsc"
+
+      - name: Set up vcpkg
+        shell: cmd
+        run: |
+          rem make sure the runner's vcpkg knows the baseline pinned in vcpkg.json
+          git -C "%VCPKG_INSTALLATION_ROOT%" pull --quiet
+          call "%VCPKG_INSTALLATION_ROOT%\bootstrap-vcpkg.bat" -disableMetrics
+          "%VCPKG_INSTALLATION_ROOT%\vcpkg.exe" integrate install
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Build exe
+        shell: cmd
+        run: msbuild "BO3 Practice Tool.sln" /m /nologo /v:minimal /p:Configuration=Release /p:Platform=x64
+
+      - name: Package
+        shell: cmd
+        run: |
+          robocopy "x64\Release" "dist\BO3 Practice Tool" /e /xf *.pdb *.iobj *.ipdb *.lib *.exp *.ilk
+          if %errorlevel% geq 8 exit /b 1
+          copy /y "Compiler\Practice Tool.gsc" "dist\BO3 Practice Tool\Compiler\Practice Tool.gsc"
+          exit /b 0
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BO3-Practice-Tool
+          path: dist/

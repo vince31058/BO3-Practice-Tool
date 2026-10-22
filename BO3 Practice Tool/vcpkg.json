@@ -1,0 +1,15 @@
+{
+  "name": "bo3-practice-tool",
+  "version-string": "1.0.0",
+  "description": "Libraries the Practice Tool needs. Visual Studio installs these automatically on the first build (vcpkg manifest mode).",
+  "builtin-baseline": "a2f9862da6d88040a8537fb9b8cb24deaa9a196b",
+  "dependencies": [
+    "curl",
+    "miniz",
+    "rapidjson",
+    "rapidxml",
+    "glm",
+    "vulkan-headers",
+    "vulkan-loader"
+  ]
+}
