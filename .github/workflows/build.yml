@@ -1,7 +1,8 @@
 # Builds the Practice Tool on a clean Windows machine on every push:
-#   1. compiles the GSC mod (fails the build on any script syntax error)
-#   2. builds BO3 Practice Tool.exe (Release x64)
-#   3. uploads a ready-to-run zip under the run's "Artifacts"
+#   1. builds BO3 Practice Tool.exe (Release x64), so a push that breaks the app shows a red X
+#   2. uploads the built app under the run's "Artifacts"
+# The in-game script isn't compiled here: the compiler stops and waits for a key press,
+# which would hang the run (it's compiled on your PC by Vin.bat instead).
 name: Build
 
 on:
@@ -11,17 +12,9 @@ on:
 jobs:
   build:
     runs-on: windows-2022
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-
-      - name: Compile GSC mod
-        shell: cmd
-        working-directory: GSC/Practice Tool - Release Version
-        run: |
-          ..\..\Compiler\DebugCompiler.exe --compile --noupdate
-          if errorlevel 1 exit /b 1
-          if not exist compiled.gsic exit /b 1
-          copy /y compiled.gsic "..\..\Compiler\Practice Tool.gsc"
 
       - name: Set up vcpkg
         shell: cmd
@@ -42,7 +35,6 @@ jobs:
         run: |
           robocopy "x64\Release" "dist\BO3 Practice Tool" /e /xf *.pdb *.iobj *.ipdb *.lib *.exp *.ilk
           if %errorlevel% geq 8 exit /b 1
-          copy /y "Compiler\Practice Tool.gsc" "dist\BO3 Practice Tool\Compiler\Practice Tool.gsc"
           exit /b 0
 
       - uses: actions/upload-artifact@v4
