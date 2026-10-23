@@ -328,8 +328,9 @@ for %%f in (*.dll) do copy /y "%%f" "%PKG%\" >nul
 xcopy "Resource Images" "%PKG%\Resource Images\" /e /i /q /y >nul
 if exist "Fonts" xcopy "Fonts" "%PKG%\Fonts\" /e /i /q /y >nul
 for %%f in ("%GAMECOMP%\*") do if /i not "%%~nxf"=="Practice Tool.gsc" copy /y "%%f" "%PKC%\Compiler\" >nul
-powershell -NoProfile -Command "Compress-Archive -Path '%PKG%\*' -DestinationPath '%REL%\BO3 Practice Tool.zip'"
-powershell -NoProfile -Command "Compress-Archive -Path '%PKC%\Compiler' -DestinationPath '%REL%\Compiler.zip'"
+rem the zips use / in paths and have no folder entries, so the app's updater can unpack them in place
+call :zipdir "%PKG%" "%REL%\BO3 Practice Tool.zip"
+call :zipdir "%PKC%" "%REL%\Compiler.zip"
 rmdir /s /q "%PKG%"
 rmdir /s /q "%PKC%"
 if not exist "%REL%\Compiler.zip" (
@@ -343,6 +344,12 @@ echo  On GitHub make a new release with the tag v%VER% and attach both zips.
 echo  Next update: raise internalVersion in Vin Source\BO3 Practice Tool\BO3 Practice Tool.cpp first
 echo  (e.g. 1.0.1), so people with this version get the update prompt.
 goto done
+
+rem ===========================================================================
+rem zip everything inside folder %1 into %2 (paths inside the zip start below %1)
+:zipdir
+powershell -NoProfile -Command "Add-Type -AssemblyName System.IO.Compression.FileSystem; $src=(Resolve-Path -LiteralPath '%~1').Path.TrimEnd('\'); $z=[IO.Compression.ZipFile]::Open('%~2','Create'); Get-ChildItem -LiteralPath $src -Recurse -File | ForEach-Object { [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($z, $_.FullName, $_.FullName.Substring($src.Length + 1).Replace('\','/')) }; $z.Dispose()"
+exit /b 0
 
 rem ===========================================================================
 :fail

@@ -540,18 +540,27 @@ namespace BO3PT
         }
 
         int num_files = mz_zip_reader_get_num_files(&zip_archive);
-        WLog::Log(WMT::Info, "Extracting " + num_files + std::string(" files from ") + filename + " to " + output_directory.string());
+        WLog::Log(WMT::Info, "Extracting " + std::to_string(num_files) + " files from " + filename + " to " + output_directory.string());
 
         for (int i = 0; i < num_files; i++) {
             mz_zip_archive_file_stat file_stat;
             if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) {
-                WLog::Log(WMT::Error, "Failed to get file stat for index " + i);
+                WLog::Log(WMT::Error, "Failed to get file stat for index " + std::to_string(i));
                 continue;
             }
 
-            std::filesystem::path output_file_path = output_directory / file_stat.m_filename;
-
+            // Zips made by Windows can use \ in paths and list folders as entries ending in \ -
+            // treat both slashes the same and just create folders instead of extracting them
             std::string currentFile(file_stat.m_filename);
+            std::replace(currentFile.begin(), currentFile.end(), '\\', '/');
+            const bool isFolder = !currentFile.empty() && currentFile.back() == '/';
+            while (!currentFile.empty() && currentFile.back() == '/') {
+                currentFile.pop_back();
+            }
+            if (currentFile.empty()) {
+                continue;
+            }
+
             bool wantedFileFound = false;
             for (const std::string_view& wantedFile : wantedFiles) {
                 if (currentFile.find(wantedFile) != currentFile.npos) {
@@ -559,30 +568,33 @@ namespace BO3PT
                     break;
                 }
             }
-
             if (!wantedFileFound) {
                 continue;
             }
 
-            WLog::Log(WMT::Info, "Extracting " + std::string(file_stat.m_filename) + " to " + output_file_path.string());
-
-            std::filesystem::create_directories(output_file_path.parent_path());
-
-            if (mz_zip_reader_is_file_a_directory(&zip_archive, i)) {
-                std::filesystem::create_directory(output_file_path);
+            std::filesystem::path output_file_path = output_directory / std::filesystem::path(currentFile).make_preferred();
+            std::error_code ec;
+            if (isFolder || mz_zip_reader_is_file_a_directory(&zip_archive, i)) {
+                std::filesystem::create_directories(output_file_path, ec);
+                continue;
             }
-            else {
-                if (currentFile == "BO3 Practice Tool.exe" && std::filesystem::exists(output_file_path)) {
-                    std::filesystem::rename(output_file_path, output_directory / "BO3 Practice Tool.old.exe");
-                    ptexe = output_file_path.string();
-                }
-                else if (std::filesystem::exists(output_file_path)) {
-                    std::filesystem::remove(output_file_path);
-                }
-                if (!mz_zip_reader_extract_to_file(&zip_archive, i, output_file_path.generic_string().c_str(), 0)) {
-                    WLog::Log(WMT::Error, "Failed to extract file " + std::string(file_stat.m_filename));
-                    return false;
-                }
+
+            WLog::Log(WMT::Info, "Extracting " + currentFile + " to " + output_file_path.string());
+            std::filesystem::create_directories(output_file_path.parent_path(), ec);
+
+            if (currentFile == "BO3 Practice Tool.exe" && std::filesystem::exists(output_file_path)) {
+                // the running exe can't be overwritten, but it can be renamed; it's deleted on the next start
+                std::filesystem::remove(output_directory / "BO3 Practice Tool.old.exe", ec);
+                std::filesystem::rename(output_file_path, output_directory / "BO3 Practice Tool.old.exe", ec);
+                ptexe = output_file_path.string();
+            }
+            else if (std::filesystem::exists(output_file_path)) {
+                std::filesystem::remove(output_file_path, ec);
+            }
+            if (!mz_zip_reader_extract_to_file(&zip_archive, i, output_file_path.string().c_str(), 0)) {
+                WLog::Log(WMT::Error, "Failed to extract file " + currentFile);
+                mz_zip_reader_end(&zip_archive);
+                return false;
             }
         }
         WLog::Log(WMT::Success, "Extraction completed successfully");
