@@ -7,6 +7,7 @@
 #include "Walnut/Logger.h"
 #include "Keybinds.h"
 #include "GUIState.h"
+#include "Memhelp.h"
 
 #define CURL_STATICLIB
 #include <curl/curl.h>
@@ -408,12 +409,20 @@ namespace BO3PT
     void InjectTool(bool enable)
     {
         std::string compilerDir = bo3Directory + "/Practice Tool/Compiler";
-        std::string compilerEXE = "\"" + compilerDir + "/DebugCompiler.exe\"";
+        // The downpatched (March 2023) exe and the current Steam (2026) exe need different injectors:
+        // DebugCompiler.exe + t7cinternal.dll for 2023, DebugCompiler26.exe + t7cintern26.dll for 2026.
+        GameBuild build = MemState::GetState() == Loaded ? MemState::GetBuild() : MemState::ResolveBuild(MemState::DetectBuildFromFile(bo3Directory + "\\BlackOps3.exe"));
+        const bool steam2026 = build == Build2026;
+        WLog::Log(WMT::Info, std::string("Injecting for game build: ") + MemState::BuildName(build == BuildUnknown ? Build2023 : build));
+        std::string compilerEXE = "\"" + compilerDir + (steam2026 ? "/DebugCompiler26.exe\"" : "/DebugCompiler.exe\"");
         // Vin build injects its own script file, so the original app's "Practice Tool.gsc" is never touched
         std::string ptPass = compilerEXE + " --inject " + "\"" + compilerDir + "\\Practice Tool Vin.gsc\" T7 scripts/shared/duplicaterender_mgr.gsc";
         std::string nmPass = compilerEXE + " --inject " + "\"" + compilerDir + "\\No Mods.gsc\" T7 scripts/shared/duplicaterender_mgr.gsc";
         std::unordered_set<std::string_view> wantedFiles = { "DebugCompiler.exe", "DebugCompiler.exe.config", "External.dll", "Ionic.Zip.dll", "Irony.dll", "No Mods.gsc", "Practice Tool Vin.gsc", "System.Buffers.dll", "System.Collections.Immutable.dll", "System.Memory.dll",
             "System.Numerics.Vectors.dll", "System.Reflection.Metadata.dll", "System.Runtime.CompilerServices.Unsafe.dll", "t7cinternal.dll", "T7CompilerLib.dll", "t8cinternal.dll", "T89CompilerLib.dll", "TreyarchCompiler.dll", "xdevkit.dll", "xdrpc.dll" };
+        if (steam2026) {
+            wantedFiles.insert({ "DebugCompiler26.exe", "DebugCompiler26.exe.config", "t7cintern26.dll" });
+        }
         for (const auto& fileName : wantedFiles) {
             std::filesystem::path path(std::filesystem::path(compilerDir) / fileName);
             if (!std::filesystem::exists(path)) {

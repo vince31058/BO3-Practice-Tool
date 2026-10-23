@@ -95,3 +95,13 @@ lookup for older presets. So every existing preset keeps working; re-save a pres
 
 Wait for keys with `WaitKey(0x..)` (or the `WaitF*` helpers), never by polling
 `compiler::waitkey` yourself; direct polling steals presses from everything else listening to that key.
+
+## Works on both game versions (1.0.5)
+The tool now injects into both the downpatched BlackOps3.exe (March 2023) and the current Steam exe
+(2026 updates), and picks the right one by itself from the exe's link date.
+- `Compiler/DebugCompiler26.exe` + `Compiler/t7cintern26.dll`: the same injector with the game addresses
+  moved to the 2026 exe (from Scroptss's t7-compiler update, checked against the 2026 exe's function table).
+  The originals (`DebugCompiler.exe`, `t7cinternal.dll`) are unchanged and still used for the downpatched exe.
+- The app reads the map name and round at the 2026 addresses on the new exe (found and checked at runtime).
+- Miscellaneous → Install Location → **Game Version** shows which exe was found and lets you force one.
+- `bo3-autosplits.asl` handles both exes; `Vin.bat` picks the right injector for option 1.

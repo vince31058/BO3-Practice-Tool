@@ -134,26 +134,33 @@ if not "%BO3:~-1%"=="\" set "BO3=%BO3%\"
 set "DEST=%BO3%Practice Tool\Compiler"
 if not exist "%DEST%" mkdir "%DEST%"
 
+rem the current Steam exe (2026 updates) needs the 2026 injector, the downpatched exe the original one
+set "DC=DebugCompiler.exe"
+for /f "usebackq delims=" %%t in (`powershell -NoProfile -Command "try{$f=[IO.File]::OpenRead('%BO3%BlackOps3.exe'); $h=New-Object byte[] 4096; [void]$f.Read($h,0,4096); $f.Close(); $p=[BitConverter]::ToInt32($h,60); if([BitConverter]::ToUInt32($h,$p+8) -ge 1767225600){'2026'}else{'2023'}}catch{'2023'}"`) do set "GAMEBUILD=%%t"
+if "%GAMEBUILD%"=="2026" set "DC=DebugCompiler26.exe"
+if not exist "Mod Source\Compiler\%DC%" set "DC=DebugCompiler.exe"
+echo  Game exe: %GAMEBUILD% build
 taskkill /im DebugCompiler.exe /f >nul 2>&1
+taskkill /im DebugCompiler26.exe /f >nul 2>&1
 if exist "Mod Source\compiled.gsic" del /q "Mod Source\compiled.gsic"
 if exist "%LOG%" del /q "%LOG%"
 rem The Practice Tool's compiler only has "--build": compile the scripts folder, inject
 rem into the game, then wait for a key (a key would undo the inject). It runs
 rem minimized; this watches its output and closes it once it's done.
-start "Vin compiler" /min /d "%ROOT%Mod Source" cmd /c ""%ROOT%Mod Source\Compiler\DebugCompiler.exe" --build > "%LOG%" 2>&1"
+start "Vin compiler" /min /d "%ROOT%Mod Source" cmd /c ""%ROOT%Mod Source\Compiler\%DC%" --build > "%LOG%" 2>&1"
 echo  Compiling...
 set /a WAITED=0
 :script_wait
 ping -n 2 127.0.0.1 >nul
 set /a WAITED+=1
-tasklist /fi "imagename eq DebugCompiler.exe" 2>nul | find /i "DebugCompiler.exe" >nul
+tasklist /fi "imagename eq %DC%" 2>nul | find /i "%DC%" >nul
 if errorlevel 1 goto script_compiled
 findstr /c:"parsetree" "%LOG%" >nul 2>&1
 if not errorlevel 1 goto script_stop
 if %WAITED% lss 120 goto script_wait
 echo  The compiler didn't finish within 2 minutes - stopping it.
 :script_stop
-taskkill /im DebugCompiler.exe /f >nul 2>&1
+taskkill /im %DC% /f >nul 2>&1
 :script_compiled
 
 if not exist "Mod Source\compiled.gsic" (
@@ -162,6 +169,8 @@ if not exist "Mod Source\compiled.gsic" (
     goto fail
 )
 if not exist "%DEST%\DebugCompiler.exe" xcopy "Mod Source\Compiler\*" "%DEST%\" /y /q >nul
+rem the 2026 injector (DebugCompiler26.exe + t7cintern26.dll) for the current Steam exe
+for %%f in (DebugCompiler26.exe DebugCompiler26.exe.config t7cintern26.dll) do if exist "Mod Source\Compiler\%%f" if not exist "%DEST%\%%f" copy /y "Mod Source\Compiler\%%f" "%DEST%\" >nul
 copy /y "Mod Source\compiled.gsic" "%DEST%\Practice Tool Vin.gsc" >nul
 if errorlevel 1 (
     echo  Couldn't write to "%DEST%". Close anything using it and try again.

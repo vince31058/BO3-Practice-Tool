@@ -95,7 +95,7 @@ static MSSelection sidebarSelections({ {{ "Player Loadouts", "Autosplits", "Prac
 static MSSelection weaponSelections;
 static std::vector<MSSelection> autosplitSelections;
 
-static std::string internalVersion = "1.0.4"; // raise this for every GitHub release; the release tag is v + this number
+static std::string internalVersion = "1.0.5"; // raise this for every GitHub release; the release tag is v + this number
 static Walnut::Image* discordIcon;
 static Walnut::Image* weaponWarning;
 
@@ -654,6 +654,9 @@ void SetupData()
     }
     else {
         WLog::Log(WMT::Info, "BO3 directory not saved - prompting user for input");
+    }
+    if (builder.GetDocument().HasMember("Game Version") && builder.GetDocument()["Game Version"].IsInt()) {
+        MemState::SetBuildOverride(std::clamp(builder.GetDocument()["Game Version"].GetInt(), 0, 2));
     }
     if (DoesPathExist(bo3Directory)) {
         GUIState::SetState(SteamFound);
@@ -4677,6 +4680,55 @@ void InstallLocationFunc()
         ImGui::TextColored(messageGood ? ImVec4(0.3f, 0.8f, 0.3f, 1.0f) : ImVec4(0.95f, 0.7f, 0.2f, 1.0f), "%s", message.c_str());
     }
     EndAppearanceCard();
+
+    // Game Version: the downpatched exe and the current Steam exe need different injectors
+    {
+        static uint32_t fileTimestamp = 0;
+        static GameBuild fileBuild = BuildUnknown;
+        static std::string checkedFolder;
+        static double nextCheck = 0.0;
+        if (checkedFolder != gameFolder || ImGui::GetTime() >= nextCheck) {
+            fileBuild = gameFound ? MemState::DetectBuildFromFile(gameFolder + "\\BlackOps3.exe", &fileTimestamp) : BuildUnknown;
+            checkedFolder = gameFolder;
+            nextCheck = ImGui::GetTime() + 5.0;
+        }
+        const bool running = MemState::GetState() == Loaded;
+        const GameBuild detected = running ? MemState::GetBuild() : MemState::ResolveBuild(fileBuild);
+        const bool injector26 = DoesPathExist(toolGameFolder + "\\Compiler\\DebugCompiler26.exe") && DoesPathExist(toolGameFolder + "\\Compiler\\t7cintern26.dll");
+
+        BeginAppearanceCard("##GameVersionCard", "Game Version", 215.0f);
+        ImGui::TextDisabled("The practice tool works with both the downpatched exe and the current Steam exe. It picks the right injector by itself.");
+        ImGui::Spacing();
+        ImGui::TextUnformatted(running ? "Running game" : "BlackOps3.exe in the game folder");
+        ImGui::SameLine(260.0f);
+        ImGui::TextColored(detected == BuildUnknown ? ImVec4(0.95f, 0.7f, 0.2f, 1.0f) : ImVec4(0.3f, 0.8f, 0.3f, 1.0f), "%s", MemState::BuildName(detected));
+        if (detected == Build2026) {
+            StatusLine("2026 injector", injector26, "Installed", "Missing - update the practice tool");
+        }
+        ImGui::Spacing();
+        int choice = MemState::GetBuildOverride();
+        bool changed = false;
+        ImGui::TextUnformatted("Use");
+        ImGui::SameLine();
+        changed |= ImGui::RadioButton("Detect automatically", &choice, 0);
+        ImGui::SameLine();
+        changed |= ImGui::RadioButton("Downpatched", &choice, 1);
+        ImGui::SameLine();
+        changed |= ImGui::RadioButton("Current Steam", &choice, 2);
+        if (changed) {
+            MemState::SetBuildOverride(choice);
+            WJson settings = WJson::FromFile(selfDirectory + "\\settings.json");
+            settings.ModifyInt(settings.GetDocument(), "Game Version", choice);
+            settings.SaveToFile(selfDirectory + "\\settings.json");
+            if (running) {
+                // pick the addresses for the chosen build again
+                MemState::SetAddresses(L"BlackOps3.exe");
+            }
+            WLog::Log(WMT::Info, std::string("Game Version set to ") + (choice == 0 ? "automatic" : MemState::BuildName(choice == 1 ? Build2023 : Build2026)));
+        }
+        ImGui::TextDisabled("Only change this if the tool won't turn on. Online play needs the current Steam exe.");
+        EndAppearanceCard();
+    }
 
     BeginAppearanceCard("##ToolFolderCard", "This App's Folder", 140.0f);
     ImGui::PushFont(safeFont);
