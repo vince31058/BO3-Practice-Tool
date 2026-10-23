@@ -842,7 +842,9 @@ inline AutosplitLists autosplits = {
 		}},
 		{ "zm_tomb", {
 			{ "Staff", { "Ice Craft", "Wind Craft", "Fire Craft", "Lightning Craft" } },
-			{ "Origins EE End", { "Upgrade Leave", "4 Boxes Done", "Fists Done" } }
+			{ "Origins EE End", { "Upgrade Leave", "4 Boxes Done", "Fists Done" } },
+			{ "Portal To Crazy Place", { "Ice Enter", "Wind Enter", "Fire Enter", "Lightning Enter" } },
+			{ "Portal Out Of Crazy Place", { "Ice Leave", "Wind Leave", "Fire Leave", "Lightning Leave" } }
 		}}
 	}
 };

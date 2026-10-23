@@ -31,7 +31,8 @@ LoadSplits()
     ::SplitReelPlace1, ::SplitReelPickup2, ::SplitReelPlace2, ::SplitReelPickup3, ::SplitReelPlace3, ::SplitHouseTP, ::SplitEgg1, ::SplitEgg2, ::SplitEgg3, ::SplitEgg4, ::SplitRune1, ::SplitRune2, ::SplitRune3, ::SplitRune4, ::SplitBoss1, ::SplitSymbols,
     ::SplitBossRush, ::SplitBoss2);
     split_funcs["zm_moon"] = Array(::SplitMoonPowerOn, ::SplitMoonSimonSays, ::SplitMoonSecurityOverride, ::SplitMoonFocus, ::SplitMoonFirstTank, ::SplitMoonSecondTank, ::WaitMoonEnd);
-    split_funcs["zm_tomb"] = Array(::SplitIceCraft, ::SplitWindCraft, ::SplitFireCraft, ::SplitLightningCraft, ::SplitUpgrade, ::SplitBoxes, ::SplitFists);
+    split_funcs["zm_tomb"] = Array(::SplitIceCraft, ::SplitWindCraft, ::SplitFireCraft, ::SplitLightningCraft, ::SplitUpgrade, ::SplitBoxes, ::SplitFists,
+    ::SplitIceEnter, ::SplitWindEnter, ::SplitFireEnter, ::SplitLightningEnter, ::SplitIceLeave, ::SplitWindLeave, ::SplitFireLeave, ::SplitLightningLeave);
     split_labels["zm_zod"] = Array(&"Magician Ritual: ", &"Femme Ritual: ", &"Detective Ritual: ", &"Boxer Ritual: ", &"PAP Ritual: ", &"Canals Rift: ", &"Footlight Rift: ", &"Waterfront Rift: ", &"Rift Canals: ", &"Rift Footlight: ", &"Rift Waterfront: ",
     &"Canals Egg: ", &"Footlight Egg: ", &"Waterfront Egg: ", &"Rift Egg: ", &"Sword: ", &"Junction Ovum: ", &"Canals Ovum: ", &"Footlight Ovum: ", &"Waterfront Ovum: ", &"Upgraded Sword: ", &"Book: ", &"Flag 1: ", &"Flag 2: ", &"Flag 3: ", &"Flag 4: ");
     split_labels["zm_castle"] = Array(&"Church Dragon: ", &"Courtyard Dragon: ", &"Undercroft Dragon: ", &"Pickup Bow: ", &"Start Lightning: ", &"Bonfires Shot: ", &"Wall Ride: ", &"Crackle: ", &"Upgrade Lightning: ", &"Start Fire: ", &"Obelisk Shot: ",
@@ -44,13 +45,15 @@ LoadSplits()
     &"Place Reel 1: ", &"Pickup Reel 2: ", &"Place Reel 2: ", &"Pickup Reel 3: ", &"Place Reel 3: ", &"House: ", &"Egg 1: ", &"Egg 2: ", &"Egg 3: ", &"Egg 4: ", &"Rune 1: ", &"Rune 2: ", &"Rune 3: ", &"Rune 4: ",
     &"Boss 1: ", &"Symbols: ", &"Basketball: ", &"Boss 2: ");
     split_labels["zm_moon"] = Array(&"Power On: ", &"Samantha Says: ", &"Terminals: ", &"Vril Sphere: ", &"Canister #1: ", &"Canister #2: ", &"Earth Boom: ");
-    split_labels["zm_tomb"] = Array(&"Ice Staff: ", &"Wind Staff: ", &"Fire Staff: ", &"Lightning Staff: ", &"Upgrade: ", &"Boxes: ", &"Fists: ");
+    split_labels["zm_tomb"] = Array(&"Ice Staff: ", &"Wind Staff: ", &"Fire Staff: ", &"Lightning Staff: ", &"Upgrade: ", &"Boxes: ", &"Fists: ",
+    &"Ice Enter: ", &"Wind Enter: ", &"Fire Enter: ", &"Lightning Enter: ", &"Ice Leave: ", &"Wind Leave: ", &"Fire Leave: ", &"Lightning Leave: ");
     active_funcs = [];
     active_labels = [];
     round_funcs = [];
     round_params = [];
 
     if(level.script == "zm_moon") thread TrackMoonQuest();
+    if(level.script == "zm_tomb") thread TrackTombPortalLeaves();
 
     for(i = 0; i < split_size; i++)
     {

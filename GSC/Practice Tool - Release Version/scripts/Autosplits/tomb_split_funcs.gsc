@@ -32,3 +32,43 @@ SplitFists()
 {
     WaitFists();
 }
+
+SplitIceEnter()
+{
+    WaitPortalEnter(4);
+}
+
+SplitWindEnter()
+{
+    WaitPortalEnter(2);
+}
+
+SplitFireEnter()
+{
+    WaitPortalEnter(1);
+}
+
+SplitLightningEnter()
+{
+    WaitPortalEnter(3);
+}
+
+SplitIceLeave()
+{
+    WaitPortalLeave(4);
+}
+
+SplitWindLeave()
+{
+    WaitPortalLeave(2);
+}
+
+SplitFireLeave()
+{
+    WaitPortalLeave(1);
+}
+
+SplitLightningLeave()
+{
+    WaitPortalLeave(3);
+}
