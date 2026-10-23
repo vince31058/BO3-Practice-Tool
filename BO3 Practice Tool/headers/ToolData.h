@@ -40,7 +40,8 @@ namespace BO3PT
 		PlayerLoadouts,
 		SoftPatchGums,
 		MoonMen,
-		Credits
+		Credits,
+		InstallLocation
 	};
 
 #pragma region Craftables

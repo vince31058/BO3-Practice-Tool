@@ -73,6 +73,7 @@ void PlayerLoadoutsFunc();
 void SoftPatchGumsFunc();
 void MoonMenFunc();
 void CreditsFunc();
+void InstallLocationFunc();
 RenderWindow SidebarToWindow(int sidebarIndex);
 void LoadImagesForWindow(RenderWindow window);
 static void LoadSoftPatchGums();
@@ -90,11 +91,11 @@ static ImGuiWindowFlags dockFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFla
 static ImGuiViewport* viewport;
 
 static MSSelection sidebarSelections({ {{ "Player Loadouts", "Autosplits", "Practice Patches", "Soft Patch Gums", "Settings" }}, {{ "Player Options", "Zombie Options", "Egg Step Options", "Craftable Options", "Blocker Options" }},
-        {{ "Zombie Calculator", "Code Guides", "GK Valve Solver" }}, {{ "Moon Men", "Appearance", "Credits" }} });
+        {{ "Zombie Calculator", "Code Guides", "GK Valve Solver" }}, {{ "Moon Men", "Appearance", "Install Location", "Credits" }} });
 static MSSelection weaponSelections;
 static std::vector<MSSelection> autosplitSelections;
 
-static std::string internalVersion = "1.0.2"; // raise this for every GitHub release; the release tag is v + this number
+static std::string internalVersion = "1.0.3"; // raise this for every GitHub release; the release tag is v + this number
 static Walnut::Image* discordIcon;
 static Walnut::Image* weaponWarning;
 
@@ -711,6 +712,7 @@ void SetupData()
     GUIState::AddMember({ std::function<void()>(SoftPatchGumsFunc) });
     GUIState::AddMember({ std::function<void()>(MoonMenFunc) });
     GUIState::AddMember({ std::function<void()>(CreditsFunc) });
+    GUIState::AddMember({ std::function<void()>(InstallLocationFunc) });
 
 
     for (int i = 0; i < static_cast<int>(t7Maps.size()); i++) {
@@ -4557,6 +4559,141 @@ static std::string CurrentFontName()
     return std::filesystem::path(uiFontPath).stem().string();
 }
 
+// Miscellaneous > Install Location
+// Where the practice tool puts its in-game files: <Black Ops III folder>\Practice Tool (compiler,
+// in-game script and settings). If Black Ops III is moved, point the tool at the new folder here;
+// the Practice Tool folder is copied over from the old location if it's still there, so nothing
+// has to be reinstalled.
+static void BeginAppearanceCard(const char* id, const char* title, float height);
+static void EndAppearanceCard();
+
+static void OpenFolder(const std::string& folder)
+{
+    std::string path = folder;
+    std::thread([path]() { ShellExecuteA(NULL, "open", path.c_str(), NULL, NULL, SW_SHOWNORMAL); }).detach();
+}
+
+static void StatusLine(const char* label, bool ok, const char* okText, const char* badText)
+{
+    ImGui::TextUnformatted(label);
+    ImGui::SameLine(260.0f);
+    ImGui::TextColored(ok ? ImVec4(0.3f, 0.8f, 0.3f, 1.0f) : ImVec4(0.9f, 0.3f, 0.3f, 1.0f), "%s", ok ? okText : badText);
+}
+
+void InstallLocationFunc()
+{
+    static std::string message;
+    static bool messageGood = true;
+    const std::string gameFolder = bo3Directory;
+    const std::string toolGameFolder = gameFolder + "\\Practice Tool";
+    const bool gameFound = !gameFolder.empty() && DoesPathExist(gameFolder + "\\BlackOps3.exe");
+    const bool compilerFound = DoesPathExist(toolGameFolder + "\\Compiler\\DebugCompiler.exe");
+    const bool scriptFound = DoesPathExist(toolGameFolder + "\\Compiler\\Practice Tool Vin.gsc");
+
+    ImGui::BeginChild("##InstallScroll", ImGui::GetContentRegionAvail());
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 25.0f);
+    TextFont::Render("Install Location", titleFont);
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 25.0f);
+    ImGui::TextDisabled("Moved Black Ops III to another folder or drive? Point the practice tool at it here instead of reinstalling.");
+    ImGui::Spacing();
+    ImGui::Indent(25.0f);
+
+    BeginAppearanceCard("##GameFolderCard", "Black Ops III Folder", 205.0f);
+    ImGui::PushFont(safeFont);
+    ImGui::TextWrapped("%s", gameFolder.empty() ? "(not set)" : gameFolder.c_str());
+    ImGui::PopFont();
+    ImGui::Spacing();
+    StatusLine("Black Ops III (BlackOps3.exe)", gameFound, "Found", "Not found - pick the folder again");
+    StatusLine("Practice Tool compiler", compilerFound, "Installed", "Missing");
+    StatusLine("Practice Tool in-game script", scriptFound, "Installed", "Missing - run the tool once or update it");
+    ImGui::Spacing();
+
+    const bool active = GUIState::IsStateSet(Active);
+    if (active) {
+        ImGui::BeginDisabled();
+    }
+    if (Button::RenderSingle("Change Folder...", ImVec2(150, 25))) {
+        std::string newFolder = SelectFolder();
+        if (newFolder.empty()) {
+            // cancelled
+        }
+        else if (!DoesPathExist(newFolder + "\\BlackOps3.exe")) {
+            message = "That folder doesn't have BlackOps3.exe in it. Pick the main Black Ops III folder.";
+            messageGood = false;
+        }
+        else {
+            const std::string newToolFolder = newFolder + "\\Practice Tool";
+            std::error_code ec;
+            bool copied = false;
+            // bring the old Practice Tool folder (compiler, in-game script, settings) along if it still exists
+            if (!gameFolder.empty() && newFolder != gameFolder && DoesPathExist(toolGameFolder)) {
+                std::filesystem::copy(toolGameFolder, newToolFolder,
+                    std::filesystem::copy_options::recursive | std::filesystem::copy_options::skip_existing, ec);
+                copied = !ec;
+            }
+            bo3Directory = newFolder;
+            WJson builder = WJson::FromFile(selfDirectory + "\\settings.json");
+            builder.ModifyString(builder.GetDocument(), "Steam Path", bo3Directory);
+            builder.SaveToFile(selfDirectory + "\\settings.json");
+            GUIState::SetState(SteamFound);
+            VerifyExternalFiles();
+            WriteBGBPresetToGame();
+            WriteWeaponLoadoutToGame();
+            WriteAutosplitPresetToGame();
+            WritePracticePatches();
+            SaveSoftPatchGums();
+            WLog::Log(WMT::Info, "Black Ops III folder changed to " + bo3Directory);
+            message = copied ? "Saved. Your Practice Tool files were copied to the new folder." : "Saved. The practice tool will use the new folder from now on.";
+            if (ec) {
+                message = "Saved, but copying the old Practice Tool folder failed: " + ec.message();
+            }
+            messageGood = !ec;
+            if (!DoesPathExist(newToolFolder + "\\Compiler\\DebugCompiler.exe")) {
+                message += " The compiler isn't in the new folder yet - use the download button at the top left to get it.";
+                messageGood = false;
+            }
+        }
+    }
+    if (active) {
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::TextDisabled("Turn the tool off first");
+    }
+    ImGui::SameLine();
+    if (!gameFound) {
+        ImGui::BeginDisabled();
+    }
+    if (Button::RenderSingle("Open Folder##GameFolder", ImVec2(120, 25))) {
+        OpenFolder(gameFolder);
+    }
+    ImGui::SameLine();
+    if (Button::RenderSingle("Open Practice Tool Folder##GameToolFolder", ImVec2(210, 25))) {
+        OpenFolder(toolGameFolder);
+    }
+    if (!gameFound) {
+        ImGui::EndDisabled();
+    }
+    if (!message.empty()) {
+        ImGui::TextColored(messageGood ? ImVec4(0.3f, 0.8f, 0.3f, 1.0f) : ImVec4(0.95f, 0.7f, 0.2f, 1.0f), "%s", message.c_str());
+    }
+    EndAppearanceCard();
+
+    BeginAppearanceCard("##ToolFolderCard", "This App's Folder", 140.0f);
+    ImGui::PushFont(safeFont);
+    ImGui::TextWrapped("%s", selfDirectory.c_str());
+    ImGui::PopFont();
+    ImGui::TextDisabled("You can move this folder anywhere - your presets, splits and settings are saved inside it.");
+    ImGui::TextDisabled("Keep everything in it together, and open BO3 Practice Tool.exe from the new spot.");
+    if (Button::RenderSingle("Open Folder##AppFolder", ImVec2(120, 25))) {
+        OpenFolder(selfDirectory);
+    }
+    EndAppearanceCard();
+
+    ImGui::Unindent(25.0f);
+    ImGui::Dummy(ImVec2(0, 20));
+    ImGui::EndChild();
+}
+
 // Miscellaneous > Credits
 static void OpenLink(const char* url)
 {
@@ -4823,7 +4960,7 @@ RenderWindow SidebarToWindow(int sidebarIndex)
         // In Game, Resources and Practice Tool pages (Round Options is a tab in Zombie Options and
         // Powerup Options a tab in Player Options, so they have no sidebar entry)
         static const RenderWindow pages[] = { PlayerOptions, ZombieOptions, EggStepOptions, CraftableOptions, BlockerOptions,
-            ZombieCalculator, CodeGuides, GKValveSolver, MoonMen, ToolSettings, Credits };
+            ZombieCalculator, CodeGuides, GKValveSolver, MoonMen, ToolSettings, InstallLocation, Credits };
         int page = sidebarIndex - 5;
         if (page < 0 || page >= static_cast<int>(sizeof(pages) / sizeof(pages[0]))) return PlayerOptions;
         return pages[page];
