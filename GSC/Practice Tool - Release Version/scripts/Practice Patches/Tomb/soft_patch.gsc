@@ -5,7 +5,6 @@
 //   - Origins preset gum pack, Reign Drops as the first gum
 //   - Recaptures only pick generators 2/3/4/5
 //   - Zombie Blood off the Gen 5 souls box
-//   - Death barriers on (the practice tool turns them off otherwise)
 //   - Robot cycle, picked with action1 then fast restart (saved in pt_tomb_soft_cycle):
 //       3 Cycle:   Thor -> Odin -> Freya (right foot), then normal
 //       4/5 Cycle: Thor -> Freya -> (free, never Odin as a single) -> Odin -> Odin (left foot), then normal
@@ -22,8 +21,6 @@ TombSoftPatch()
         return;
     }
     level.tomb_soft_active = true;
-    level.player_out_of_playable_area_monitor = 1;
-    foreach(player in GetPlayers()) player thread zm::player_out_of_playable_area_monitor();
     level.tomb_soft_cycle = GetDvarInt("pt_tomb_soft_cycle");
 
     level flag::wait_till("start_zombie_round_logic");

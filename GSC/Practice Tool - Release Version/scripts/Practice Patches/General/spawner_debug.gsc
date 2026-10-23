@@ -6,6 +6,7 @@ SpawnerDebug()
     level flag::clear("spawn_zombies");
     level flag::init("spawner_debug_active");
     self thread Godmode(1);
+    DisableDeathBarriers(); // its teleports can drop you outside the playable area
     self thread GiveAllPerks();
     self thread ActiveSpawnersHud();
     self thread ActiveSpawnerTP();

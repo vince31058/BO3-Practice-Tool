@@ -19,12 +19,8 @@ FireEnterPractice()
     level.var_2c12d9a6 = ::fe_abh;
     self thread FireEnterSettings();
 
-    // R2L death barrier: practice_death_barrier_off 0 = YES (barrier on), 1 = NO (off)
-    if(!GetDvarInt("practice_death_barrier_off"))
-    {
-        level.player_out_of_playable_area_monitor = 1;
-        self thread zm::player_out_of_playable_area_monitor();
-    }
+    // R2L death barrier: practice_death_barrier_off 0 = YES (barrier on, like the real game), 1 = NO (off)
+    if(GetDvarInt("practice_death_barrier_off")) DisableDeathBarriers();
     level thread FireEnterLoadedMessage();
     self fe_ActivatePractice();
 }

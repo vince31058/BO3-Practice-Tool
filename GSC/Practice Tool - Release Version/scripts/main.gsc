@@ -3,7 +3,8 @@ init()
     SetDvar("sv_cheats", 1);
     SetDvar("scr_firstGumFree", 1);
 	SetDvar("zm_private_rankedmatch", 1);
-    level.player_out_of_playable_area_monitor = 0; //ADD THIS AS AN OPTION 
+    // Death barriers (the out of playable area kill) stay on like the real game. Only Spawner Debug
+    // and Fire Enter Practice with its R2L Death Barrier option set to off turn them off.
     level.givecustomloadout = ::GiveLoadout;
     level.onlinegame = true;
     level.zm_disable_recording_stats = true;
@@ -197,4 +198,11 @@ InitHud(alpha = 1)
 	hud.color = (1,1,1);
 	
 	return hud;
+}
+
+// Turns the out of playable area kill off for everyone (also after respawning)
+DisableDeathBarriers()
+{
+    level.player_out_of_playable_area_monitor = 0;
+    foreach(player in GetPlayers()) player notify("stop_player_out_of_playable_area_monitor");
 }
