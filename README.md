@@ -12,7 +12,7 @@ Discord: https://discord.gg/wDuT8VJtq
 - **Vinnie / Claude** - updates to the practice tool
 
 
-Credits to Serious for his compiler: https://github.com/shiversoftdev/t7-compiler
+Credits to Serious for her compiler: https://github.com/shiversoftdev/t7-compiler
 
 # **Instructions**  
 [Video Tutorial](https://youtu.be/kMZW3IElozU)
