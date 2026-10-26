@@ -27,6 +27,7 @@ ChallengesPractice()
     self thread GiveGauntlet();
     self thread GiveDragonStrike();
     self GiveRiotshield(0);
+    self DeathBarrierGrace();
     self SetOrigin((-275.725, 4768.26, 144.125));
     self SetPlayerAngles((5.32288, -179.615, 0));
     level flag::set("story_playing");

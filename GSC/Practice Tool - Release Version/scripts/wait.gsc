@@ -94,11 +94,11 @@ WaitPlus()   { WaitKeyEither(VK_OEM_PLUS, VK_ADD); }
 //
 //   action1        ADS + Melee      or F5
 //   action2        ADS + Crouch     or F6
-//   action3        ADS + Jump       or F7
-//   action4        ADS + Reload     or F8
+//   action3        ADS + Reload     or F7
+//   action4        ADS + Jump       or F8   (ADS+Jump goes off while slide jumping, so it's the least used one)
 //   action5        ADS + Grenade    or F9
-//   save_pos       Melee + Crouch   or [      (hold both for half a second)
-//   load_pos       Melee + Jump     or ]      (hold both for half a second)
+//   save_pos       Melee + Crouch   or Numpad 1   (hold both for half a second; numpad needs Num Lock on)
+//   load_pos       Melee + Jump     or Numpad 2   (hold both for half a second)
 //   hide_controls  ADS + Use        or F3
 //   reset_patch    Melee + Grenade            (hold both for half a second)
 //
@@ -114,11 +114,11 @@ InitBinds()
     level.pt_binds = [];
     AddBind("action1", "melee", true, 0x74, "ADS+Melee/F5");
     AddBind("action2", "crouch", true, 0x75, "ADS+Crouch/F6");
-    AddBind("action3", "jump", true, 0x76, "ADS+Jump/F7");
-    AddBind("action4", "reload", true, 0x77, "ADS+Reload/F8");
+    AddBind("action3", "reload", true, 0x76, "ADS+Reload/F7");
+    AddBind("action4", "jump", true, 0x77, "ADS+Jump/F8");
     AddBind("action5", "frag", true, 0x78, "ADS+Grenade/F9");
-    AddBind("save_pos", "melee+crouch", false, 0xDB, "Melee+Crouch/[");
-    AddBind("load_pos", "melee+jump", false, 0xDD, "Melee+Jump/]");
+    AddBind("save_pos", "melee+crouch", false, 0x61, "Melee+Crouch/Num1");
+    AddBind("load_pos", "melee+jump", false, 0x62, "Melee+Jump/Num2");
     AddBind("hide_controls", "use", true, 0x72, "ADS+Use/F3");
     AddBind("reset_patch", "melee+frag", false, undefined, "Melee+Grenade");
 }

@@ -104,20 +104,19 @@ PickupUpgradedSword()
     self BuildAndActivateTrigger(s_loc.unitrigger_stub);
 }
 
+// The SOE patches make you one fixed character (GiveZodCharacter) but you keep your original
+// character's swords. This used to swap the sword after you picked it up, which left the game's own
+// sword table pointing at the other character's sword: its checks (like the Easter egg waiting for
+// everyone to hold the upgraded sword before the book shows up) never saw the sword you held. Now the
+// table for your character is pointed at your original character's swords, so the game hands those
+// out itself and every check agrees with what you're holding.
 FixSwordPickups()
 {
-    while(!self HasWeapon(GetWeapon("glaive_apothicon_3"))) wait 0.05;
-    wait 1;
-    self TakeWeapon(GetWeapon("glaive_apothicon_3"));
-    self GiveWeapon(GetWeapon("glaive_apothicon_" + self.og_characterindex));
-    self.current_sword = self.current_hero_weapon;
-	self.sword_power = 1;
-    self GadgetPowerSet(0, 100);
-    while(!self HasWeapon(GetWeapon("glaive_keeper_3"))) wait 0.05;
-    wait 1;
-    self TakeWeapon(GetWeapon("glaive_keeper_3"));
-    self GiveWeapon(GetWeapon("glaive_keeper_" + self.og_characterindex));
-    self.current_sword = self.current_hero_weapon;
-	self.sword_power = 1;
-    self GadgetPowerSet(0, 100);
+    self endon("disconnect");
+    while(!IsDefined(self.og_characterindex) || !IsDefined(level.sword_quest) || !IsDefined(level.sword_quest.weapons)) wait 0.05;
+    og = self.og_characterindex;
+    ci = self.characterindex;
+    if(og == ci) return;
+    level.sword_quest.weapons[ci][1] = GetWeapon("glaive_apothicon_" + og);
+    level.sword_quest.weapons[ci][2] = GetWeapon("glaive_keeper_" + og);
 }

@@ -206,3 +206,38 @@ DisableDeathBarriers()
     level.player_out_of_playable_area_monitor = 0;
     foreach(player in GetPlayers()) player notify("stop_player_out_of_playable_area_monitor");
 }
+
+// Patches that teleport the player call this right before the teleport. The death barrier kills you as
+// soon as you're somewhere whose zone isn't on yet, and patches teleport while their doors are still
+// opening (e.g. Ovums Practice put you at Pack-a-Punch and you died straight away). This holds the
+// barrier off until the player is standing in an enabled playable area, then it works normally again.
+DeathBarrierGrace()
+{
+    if(!IsTrue(level.pt_barrier_callback_set))
+    {
+        level.pt_barrier_callback_set = true;
+        level.pt_prev_barrier_callback = level.player_out_of_playable_area_monitor_callback;
+        level.player_out_of_playable_area_monitor_callback = ::PtBarrierCallback;
+    }
+    level.pt_barrier_hold = true;
+    self thread DeathBarrierGraceRelease();
+}
+
+DeathBarrierGraceRelease()
+{
+    self notify("pt_barrier_grace");
+    self endon("pt_barrier_grace");
+    self endon("disconnect");
+    wait 1; // let the teleport land first
+    while(!(self zm::in_enabled_playable_area())) wait 0.5;
+    wait 2;
+    level.pt_barrier_hold = false;
+}
+
+// out of playable area check: false = don't kill (barrier held), otherwise whatever the map does
+PtBarrierCallback()
+{
+    if(IsTrue(level.pt_barrier_hold)) return false;
+    if(IsDefined(level.pt_prev_barrier_callback)) return self [[level.pt_prev_barrier_callback]]();
+    return true;
+}

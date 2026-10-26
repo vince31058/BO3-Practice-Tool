@@ -105,3 +105,57 @@ The tool now injects into both the downpatched BlackOps3.exe (March 2023) and th
 - The app reads the map name and round at the 2026 addresses on the new exe (found and checked at runtime).
 - Miscellaneous → Install Location → **Game Version** shows which exe was found and lets you force one.
 - `bo3-autosplits.asl` handles both exes; `Vin.bat` picks the right injector for option 1.
+
+## v1.1.0
+
+### New
+- **Box Hits counter** – Revelations and Moon autosplit presets can show how many times you've hit the box (top right). Resets on every restart. Turn it on with the checkbox next to the splits table.
+- **DE Wisp Trainer** (Resources) – a click-and-guess drill for the time travel wisp table, showing just the 50/50s.
+- **Wisp Order Practice** (Der Eisendrache)
+  - Practice the time travel wisp step on repeat, with the map open, power on, all perks and the Storm Bow. You start at the base bow pedestal.
+  - Wisps glow like the real step but aren't named. Every hit shows "Hit (n/4)", and a fail tells you where the wisp actually was.
+  - On a fail you're sent back to the pedestal for another try.
+  - Step timer with a PB (kept until you close the game) and a route recap after every attempt.
+  - Binds: choose the first wisp, toggle zombies (round 7 with 2 zombies left), and Go Again.
+- **Bow Lineups** (Der Eisendrache)
+  - Practice bow shots with both the Wrath of the Ancients and the Storm Bow, starting at the death ray. You always play as Richtofen.
+  - Every wisp and bonfire is lit and shows "Hit" when you hit it.
+  - Optional arrow cam that follows your arrow in flight.
+- **Boss Practice** (Gorod Krovi, was Boss Quote Skip) – now gives the full Gorod Krovi loadout (perks, gums, Ray Gun Mark 3, LMG, sniper, Gauntlet, Dragon Strike, shield) and starts on round 14.
+- Luisete added to Misc > Credits.
+
+### Changes
+- **Binds:** Action 3 is now ADS + Reload / F7 and Action 4 is ADS + Jump / F8. Save / Load Position moved to Numpad 1 / Numpad 2.
+- **SOE Infinite Beast** – also opens every door, turns on every power box, gives all perks and unlocks Pack-a-Punch.
+- **SOE Flags Practice** – reworked:
+  - Puts you right next to the flag with it already spawned, on a fresh round 8.
+  - You start with Dead of Nuclear Winter, with the other 4 gums left in the cycle.
+  - Revolver, AR and Dagon's Glare.
+  - Special rounds work like the base game.
+- **SOE Soft Patch** – round 6 is now always a bug round, even if you shoot the Shadowman.
+- **Wisp 2 Practice:**
+  - Anywhere But Here is the next gum out of the machine.
+  - The next wisp is ready when you return from the past.
+  - The safe code monitors work.
+  - You're holding the Storm Bow when you come back.
+- **Keeper Practice** – added a round timer and a Keeper timer (from placing the gold rod until the keeper is done). You're holding the Storm Bow when you come back.
+- **Lockdown Practice:**
+  - Starts with an unused Anywhere But Here, and all 5 gums are in the cycle.
+  - You spawn in front of the Hatchery gum machine.
+  - Added a round timer.
+  - The generator is already on, so you can go straight into the valve step.
+  - A valve list (top right) shows each valve's number and where the password cylinder is. The green valve is left for you to find. Input the valves into your solver; this setup is only for practicing the segment and won't continue the Easter egg.
+- Removed Lightning Bow Shots (replaced by Bow Lineups).
+- Updated patch credits.
+- Small performance improvements.
+
+### Fixes
+- Fixed Player Options and Zombie Options buttons sometimes doing nothing.
+- Fixed the SOE upgraded sword not counting for the Easter egg (the book and flag now appear).
+- Fixed Ovums Practice killing you at Pack-a-Punch, plus similar instant deaths in other patches that teleport you.
+- Fixed a crash in Wisp 2 and Keeper Practice when a charged Storm Bow shot lifted a panzer.
+- The app now writes In Game commands to `log.txt`, which helps with bug reports.
+
+### Known issues
+- Charged Lightning Bow shots can still crash the game in Wisp 2 and Keeper Practice. Both patches show a warning. A rework is planned.
+- In Keeper Practice, the Ragnarok piece and the gold rod sometimes won't pick up the normal way. Pressing use near them still picks them up.

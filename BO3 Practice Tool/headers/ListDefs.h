@@ -109,6 +109,7 @@ struct AutosplitPreset
 	std::vector<std::pair<std::string, int>> m_Splits;
 	bool m_IGT = false;
 	bool m_IGRT = false;
+	bool m_BoxHits = false; // Revelations / Moon: in-game box hit counter
 	int m_NumSplits = 0;
 	int m_Map = 0;
 	int m_SplitType = 0;
@@ -853,9 +854,9 @@ inline PracticePatchLists practicePatches = {
 	{
 		{ 0, " Shadows of Evil", { "None", "Soft Patch", "Infinite Beast", "Ovums Practice", "Flags Practice" } },
 		{ 0, " The Giant", { "None", "Flytrap Practice" } },
-		{ 0, " Der Eisendrache", { "None", "Soft Patch", "Wisp 2 Practice", "Keeper Practice", "Lightning Bow Shots", "Fire Bow Shots" } },
+		{ 0, " Der Eisendrache", { "None", "Soft Patch", "Wisp 2 Practice", "Keeper Practice", "Fire Bow Shots", "Wisp Order Practice", "Bow Lineups" } },
 		{ 0, " Zetsubou No Shima", { "None", "Soft Patch" } },
-		{ 0, " Gorod Krovi", { "None", "Soft Patch", "Lockdown Practice", "Challenges Practice", "Gersh Quote Skips", "Boss Quote Skip" } },
+		{ 0, " Gorod Krovi", { "None", "Soft Patch", "Lockdown Practice", "Challenges Practice", "Gersh Quote Skips", "Boss Practice" } },
 		{ 0, " Revelations", { "None", "Soft Patch", "Arnies Practice", "Bones Practice", "Eggs Practice", "Boss 1 Practice", "Basketball Practice", "Boss 2 Practice", "Squid Shards Practice" } },
 		{ 0, " Moon", { "None", "Soft Patch", "Box Lock Practice" } },
 		{ 0, " Origins", { "None", "Soft Patch", "Wind Orb Practice", "Puzzle Practice", "Temp Lineups", "Rain Fire Lineups", "Rain Fire Panzers", "Fire Enter Practice" } },

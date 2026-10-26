@@ -56,6 +56,7 @@ OvumsPractice()
     self zm_weapons::weapon_give(GetWeapon("ar_cqb"));
     self zm_weapons::weapon_give(GetWeapon("shotgun_pump_upgraded"), 1);
     level.next_wasp_round = 6;
+    self DeathBarrierGrace();
     self SetOrigin((2620.69, -3000.64, -391.875));
     self SetPlayerAngles((4.13086, -89.7308, 0));
     GetEnt("keeper_subway_welcome", "targetname") notify("trigger", self);

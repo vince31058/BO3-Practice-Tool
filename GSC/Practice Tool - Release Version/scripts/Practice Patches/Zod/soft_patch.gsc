@@ -23,4 +23,21 @@ ZodSoftPatch()
     self thread FixSwordPickups();
 
     level.next_wasp_round = 6;
+    level thread zsp_KeepBugRoundSix();
+}
+
+// Shooting the Shadowman at the start of the game (the side quest) pushes the special rounds back, and
+// doing it twice before round 6 moves the parasite round off 6. This keeps it on round 6.
+zsp_KeepBugRoundSix()
+{
+    level endon("end_game");
+    while(level.round_number < 6)
+    {
+        if(level.next_wasp_round != 6)
+        {
+            level.next_wasp_round = 6;
+            level.wasp_round_count = 1;
+        }
+        wait 0.05;
+    }
 }

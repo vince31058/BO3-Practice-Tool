@@ -147,7 +147,15 @@ if exist "%LOG%" del /q "%LOG%"
 rem The Practice Tool's compiler only has "--build": compile the scripts folder, inject
 rem into the game, then wait for a key (a key would undo the inject). It runs
 rem minimized; this watches its output and closes it once it's done.
-start "Vin compiler" /min /d "%ROOT%Mod Source" cmd /c ""%ROOT%Mod Source\Compiler\%DC%" --build > "%LOG%" 2>&1"
+rem Run the compiler from the game's Practice Tool\Compiler folder - the same copy the app injects with.
+rem Injecting from Mod Source\Compiler loaded a second copy of t7cinternal.dll into the game, and the
+rem app's In Game buttons then talked to the wrong copy (nothing happened in game).
+if not exist "%DEST%\DebugCompiler.exe" xcopy "Mod Source\Compiler\*" "%DEST%\" /y /q >nul
+for %%f in (DebugCompiler26.exe DebugCompiler26.exe.config t7cintern26.dll) do if exist "Mod Source\Compiler\%%f" if not exist "%DEST%\%%f" copy /y "Mod Source\Compiler\%%f" "%DEST%\" >nul
+rem the compiler needs its t7pcv2.db next to it
+if exist "Mod Source\Compiler\t7pcv2.db" copy /y "Mod Source\Compiler\t7pcv2.db" "%DEST%\" >nul
+if not exist "%DEST%\%DC%" set "DC=DebugCompiler.exe"
+start "Vin compiler" /min /d "%ROOT%Mod Source" cmd /c ""%DEST%\%DC%" --build > "%LOG%" 2>&1"
 echo  Compiling...
 set /a WAITED=0
 :script_wait

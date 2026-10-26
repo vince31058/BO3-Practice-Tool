@@ -41,7 +41,8 @@ namespace BO3PT
 		SoftPatchGums,
 		MoonMen,
 		Credits,
-		InstallLocation
+		InstallLocation,
+		WispTrainer
 	};
 
 #pragma region Craftables

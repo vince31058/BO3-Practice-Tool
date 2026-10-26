@@ -1,16 +1,35 @@
 BossQuoteSkipPractice()
 {
-    level flag::wait_till("initial_blackscreen_passed");
+    WaitFadeIn();
     if(level.script != "zm_stalingrad")
     {
+        level flag::wait_till("initial_blackscreen_passed");
         thread WriteToScreen("Wrong Map - This Patch Is For Gorod Krovi");
         return;
     }
+    self.bgb_pack = Array("zm_bgb_perkaholic", "zm_bgb_reign_drops", "zm_bgb_dead_of_nuclear_winter", "zm_bgb_anywhere_but_here", "zm_bgb_shopping_free");
+    level.players[0].bgb_pack = Array("zm_bgb_perkaholic", "zm_bgb_reign_drops", "zm_bgb_dead_of_nuclear_winter", "zm_bgb_anywhere_but_here", "zm_bgb_shopping_free");
+    level flag::wait_till("initial_blackscreen_passed");
+    thread WriteToScreen("Boss Practice Loaded");
     self.score = 50000;
     self thread OpenAllDoors();
     self thread ActivateAllPower();
+    foreach(weapon in self GetWeaponsListPrimaries())
+    {
+        self TakeWeapon(weapon);
+        wait 0.1;
+    }
+    self thread GiveAllPerks();
+    self zm_weapons::weapon_give(level.w_raygun_mark3_upgraded, 1);
+    self zm_weapons::weapon_give(GetWeapon("lmg_cqb"));
+    self zm_weapons::weapon_give(GetWeapon("sniper_fastsemi"));
+    self thread GiveGauntlet();
+    self thread GiveDragonStrike();
+    self GiveRiotshield(0);
+    self DeathBarrierGrace();
     self SetOrigin((-275.725, 4768.26, 144.125));
     self SetPlayerAngles((5.32288, 179.615, 0));
+    thread SkipToRound(14);
     level flag::clear("spawn_zombies");
     level flag::set("story_playing");
     IPrintLnBold("Wait...");

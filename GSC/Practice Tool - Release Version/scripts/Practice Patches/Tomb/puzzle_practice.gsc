@@ -23,6 +23,7 @@ PuzzlePractice()
     self zm_weapons::weapon_give(GetWeapon("staff_air"));
     level flag::clear("spawn_zombies");
 
+    self DeathBarrierGrace();
     self SetOrigin((10345.8, -7916.6, -411.875));
 }
 

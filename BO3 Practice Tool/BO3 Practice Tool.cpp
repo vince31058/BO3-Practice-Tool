@@ -15,6 +15,7 @@
 #include <cwctype>
 #include <cctype>
 #include <cstring>
+#include <random>
 
 #include "Walnut/Application.h"
 #include "Walnut/Image.h"
@@ -74,6 +75,7 @@ void SoftPatchGumsFunc();
 void MoonMenFunc();
 void CreditsFunc();
 void InstallLocationFunc();
+void WispTrainerFunc();
 RenderWindow SidebarToWindow(int sidebarIndex);
 void LoadImagesForWindow(RenderWindow window);
 static void LoadSoftPatchGums();
@@ -91,11 +93,11 @@ static ImGuiWindowFlags dockFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFla
 static ImGuiViewport* viewport;
 
 static MSSelection sidebarSelections({ {{ "Player Loadouts", "Autosplits", "Practice Patches", "Soft Patch Gums", "Settings" }}, {{ "Player Options", "Zombie Options", "Egg Step Options", "Craftable Options", "Blocker Options" }},
-        {{ "Zombie Calculator", "Code Guides", "GK Valve Solver" }}, {{ "Moon Men", "Appearance", "Install Location", "Credits" }} });
+        {{ "Zombie Calculator", "Code Guides", "GK Valve Solver", "DE Wisp Trainer" }}, {{ "Moon Men", "Appearance", "Install Location", "Credits" }} });
 static MSSelection weaponSelections;
 static std::vector<MSSelection> autosplitSelections;
 
-static std::string internalVersion = "1.0.5"; // raise this for every GitHub release; the release tag is v + this number
+static std::string internalVersion = "1.1.0"; // major.addition.fix: new feature -> middle number (+ reset the last), fix/small change -> last number. Release tag is v + this
 static Walnut::Image* discordIcon;
 static Walnut::Image* weaponWarning;
 
@@ -716,6 +718,7 @@ void SetupData()
     GUIState::AddMember({ std::function<void()>(MoonMenFunc) });
     GUIState::AddMember({ std::function<void()>(CreditsFunc) });
     GUIState::AddMember({ std::function<void()>(InstallLocationFunc) });
+    GUIState::AddMember({ std::function<void()>(WispTrainerFunc) });
 
 
     for (int i = 0; i < static_cast<int>(t7Maps.size()); i++) {
@@ -1700,6 +1703,20 @@ void AutosplitsFunc()
 
                     ImGui::EndTable();
                 }
+
+                // Revelations and Moon are box RNG dependent: optional in-game box hit counter,
+                // next to the splits table's Move Layer column
+                const int presetMap = autosplitPresets[currentAutosplitPreset].m_Map;
+                if (presetMap >= 0 && presetMap < static_cast<int>(t7Maps.size()) && (t7Maps[presetMap] == "zm_genesis" || t7Maps[presetMap] == "zm_moon")) {
+                    ImGui::SameLine();
+                    ImGui::BeginGroup();
+                    if (ImGui::Checkbox("Box Hits", &autosplitPresets[currentAutosplitPreset].m_BoxHits)) {
+                        SaveAutosplitPreset(autosplitPresets[currentAutosplitPreset]);
+                    }
+                    ImGui::SameLine();
+                    HelpMarker::Render("Shows how many times the Mystery Box has been hit this game (top right). Starts at 0 every time the game is reset.");
+                    ImGui::EndGroup();
+                }
             }
         }
         else {
@@ -1780,7 +1797,9 @@ void DocsFunc()
 
 void PlayerOptionsFunc()
 {
-    static bool displayOnly = !GUIState::IsStateSet(Active);
+    // checked every frame: a static here locked the page's buttons off for good if the page was
+    // opened before the tool was toggled on
+    const bool displayOnly = !GUIState::IsStateSet(Active);
     if (ImGui::BeginTabBar("Player Options Tabs")) {
         if (ImGui::BeginTabItem(ICON_FA_GEAR " General Options")) {
             if (Button::RenderToggleOut("Godmode", ImVec2(100, 25), &godActive, displayOnly)) {
@@ -2021,7 +2040,9 @@ void ZombieOptionsFunc()
 
 void ZombieSettingsFunc()
 {
-    static bool displayOnly = !GUIState::IsStateSet(Active);
+    // checked every frame: a static here locked the page's buttons off for good if the page was
+    // opened before the tool was toggled on
+    const bool displayOnly = !GUIState::IsStateSet(Active);
     if (Button::RenderToggleOut("Ignore Players", ImVec2(140, 25), &zombiesIgnore, displayOnly)) {
         NotifyGame({ 1, 0, zombiesIgnore });
     }
@@ -4359,7 +4380,12 @@ static void SoftPatchGumPicker()
                 continue;
             }
             static char searchText[2][64] = { "", "" };
-            std::vector<BGB> list = searchText[type][0] ? BGBSearch(type, searchText[type]) : (type ? bgbs.m_Megas : bgbs.m_Classics);
+            // only a search builds a new list; otherwise draw straight from the gum list (no copy every frame)
+            std::vector<BGB> searched;
+            if (searchText[type][0]) {
+                searched = BGBSearch(type, searchText[type]);
+            }
+            const std::vector<BGB>& list = searchText[type][0] ? searched : (type ? bgbs.m_Megas : bgbs.m_Classics);
             ImGui::InputText((std::string("Gobblegum Search##SoftPatchGums") + std::to_string(type)).c_str(), searchText[type], IM_ARRAYSIZE(searchText[type]));
             ImGui::PushStyleColor(ImGuiCol_Button, COLOR_TRANSPARENT);
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, COLOR_BLUE_WEAK);
@@ -4589,9 +4615,18 @@ void InstallLocationFunc()
     static bool messageGood = true;
     const std::string gameFolder = bo3Directory;
     const std::string toolGameFolder = gameFolder + "\\Practice Tool";
-    const bool gameFound = !gameFolder.empty() && DoesPathExist(gameFolder + "\\BlackOps3.exe");
-    const bool compilerFound = DoesPathExist(toolGameFolder + "\\Compiler\\DebugCompiler.exe");
-    const bool scriptFound = DoesPathExist(toolGameFolder + "\\Compiler\\Practice Tool Vin.gsc");
+    // file checks once a second instead of every frame
+    static bool gameFound = false, compilerFound = false, scriptFound = false, injector26Found = false;
+    static double nextFileCheck = 0.0;
+    static std::string checkedFilesFolder;
+    if (checkedFilesFolder != gameFolder || ImGui::GetTime() >= nextFileCheck) {
+        gameFound = !gameFolder.empty() && DoesPathExist(gameFolder + "\\BlackOps3.exe");
+        compilerFound = DoesPathExist(toolGameFolder + "\\Compiler\\DebugCompiler.exe");
+        scriptFound = DoesPathExist(toolGameFolder + "\\Compiler\\Practice Tool Vin.gsc");
+        injector26Found = DoesPathExist(toolGameFolder + "\\Compiler\\DebugCompiler26.exe") && DoesPathExist(toolGameFolder + "\\Compiler\\t7cintern26.dll");
+        checkedFilesFolder = gameFolder;
+        nextFileCheck = ImGui::GetTime() + 1.0;
+    }
 
     ImGui::BeginChild("##InstallScroll", ImGui::GetContentRegionAvail());
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 25.0f);
@@ -4694,7 +4729,7 @@ void InstallLocationFunc()
         }
         const bool running = MemState::GetState() == Loaded;
         const GameBuild detected = running ? MemState::GetBuild() : MemState::ResolveBuild(fileBuild);
-        const bool injector26 = DoesPathExist(toolGameFolder + "\\Compiler\\DebugCompiler26.exe") && DoesPathExist(toolGameFolder + "\\Compiler\\t7cintern26.dll");
+        const bool injector26 = injector26Found;
 
         BeginAppearanceCard("##GameVersionCard", "Game Version", 215.0f);
         ImGui::TextDisabled("The practice tool works with both the downpatched exe and the current Steam exe. It picks the right injector by itself.");
@@ -4744,6 +4779,240 @@ void InstallLocationFunc()
     ImGui::Unindent(25.0f);
     ImGui::Dummy(ImVec2(0, 20));
     ImGui::EndChild();
+}
+
+// Resources > DE Wisp Trainer
+// Click-and-guess drill for Der Eisendrache's time travel wisp step. A solo run is simulated the way
+// the game does it (zm_castle_ee::function_ee0ff0d1): the first wisp is any spot, every next one is a
+// coin flip between the 2 closest spots not shot yet, and 4 wisps finish the step. Each time you pick
+// the two spots of the 50/50 (any order); the table is the community wisp chart.
+namespace WispDrill
+{
+    static const char* names[8] = { "Clock", "Radio", "Power", "Globe", "Clocktower", "Boxes", "Car", "Spawn" };
+    // each spot's closest spots, nearest first: the 50/50 is the first two not shot yet
+    static const int rows[8][4] = {
+        { 1, 2, 3, 4 },   // Clock: Radio, Power, Globe, Clocktower
+        { 0, 2, 3, 4 },   // Radio: Clock, Power, Globe, Clocktower
+        { 1, 3, 0, 6 },   // Power: Radio, Globe, Clock, Car
+        { 1, 2, 0, 5 },   // Globe: Radio, Power, Clock, Boxes
+        { 1, 2, 0, 7 },   // Clocktower: Radio, Power, Clock, Spawn
+        { 6, 2, 3, 7 },   // Boxes: Car, Power, Globe, Spawn
+        { 5, 7, 2, 3 },   // Car: Boxes, Spawn, Power, Globe
+        { 6, 5, 4, 2 } }; // Spawn: Car, Boxes, Clocktower, Power
+
+    static std::vector<int> path;     // wisps shot so far, the last one is the current wisp
+    static int picks[2] = { -1, -1 };
+    static bool checked = false;
+    static int result = 0;            // 2 = right, 0 = wrong
+    static int answer[2] = { -1, -1 };
+    static int nextWisp = -1;
+    static int correct = 0, total = 0, streak = 0, bestStreak = 0;
+    static bool showTable = false;
+    static bool started = false;
+
+    static unsigned Roll(unsigned n)
+    {
+        static std::mt19937 rng{ std::random_device{}() };
+        return std::uniform_int_distribution<unsigned>(0, n - 1)(rng);
+    }
+
+    static bool Shot(int spot)
+    {
+        return std::find(path.begin(), path.end(), spot) != path.end();
+    }
+
+    static void FiftyFifty(int current, int out[2])
+    {
+        int n = 0;
+        out[0] = out[1] = -1;
+        for (int k = 0; k < 4 && n < 2; k++) {
+            if (!Shot(rows[current][k])) {
+                out[n++] = rows[current][k];
+            }
+        }
+    }
+
+    static void NewRun()
+    {
+        path.clear();
+        path.push_back(static_cast<int>(Roll(8)));
+        picks[0] = picks[1] = -1;
+        checked = false;
+        nextWisp = -1;
+        started = true;
+    }
+
+    static void Check()
+    {
+        FiftyFifty(path.back(), answer);
+        // order doesn't matter: just the two spots
+        if ((picks[0] == answer[0] && picks[1] == answer[1]) || (picks[0] == answer[1] && picks[1] == answer[0])) result = 2;
+        else result = 0;
+        total++;
+        if (result == 2) {
+            correct++;
+            streak++;
+            bestStreak = (std::max)(bestStreak, streak);
+        }
+        else {
+            streak = 0;
+        }
+        nextWisp = answer[Roll(2)];
+        checked = true;
+    }
+
+    static void Next()
+    {
+        path.push_back(nextWisp);
+        picks[0] = picks[1] = -1;
+        checked = false;
+        nextWisp = -1;
+    }
+
+    static std::string PathText()
+    {
+        std::string text;
+        for (size_t i = 0; i < path.size(); i++) {
+            if (i) text += "  >  ";
+            text += names[path[i]];
+        }
+        return text;
+    }
+}
+
+namespace WispDrill
+{
+static void Render()
+{
+    if (!started) {
+        NewRun();
+    }
+    const bool done = path.size() >= 4;
+    const int current = path.back();
+
+    ImGui::BeginChild("##WispTrainerScroll", ImGui::GetContentRegionAvail());
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 25.0f);
+    TextFont::Render("DE Wisp Trainer", titleFont);
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 25.0f);
+    ImGui::TextDisabled("Der Eisendrache wisp step (solo). Pick the two spots the next wisp can be at (the 50/50).");
+    ImGui::Spacing();
+    ImGui::Indent(25.0f);
+
+    ImGui::Text("Score: %d / %d", correct, total);
+    ImGui::SameLine(0, 30.0f);
+    ImGui::Text("Streak: %d", streak);
+    ImGui::SameLine(0, 30.0f);
+    ImGui::Text("Best Streak: %d", bestStreak);
+    ImGui::Spacing();
+
+    ImGui::TextUnformatted("Wisps shot:");
+    ImGui::SameLine();
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(COLOR_GREEN), "%s", PathText().c_str());
+    ImGui::Text("Wisp %d of 4", static_cast<int>(path.size()));
+    ImGui::Spacing();
+
+    if (done) {
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(COLOR_GREEN), "Step complete - 4 wisps shot. On to the teleporter!");
+    }
+    else if (!checked) {
+        if (picks[0] < 0) ImGui::Text("You just shot %s. What's the 50/50?", names[current]);
+        else ImGui::Text("You just shot %s. %s or...?", names[current], names[picks[0]]);
+    }
+    else {
+        ImVec4 color = ImGui::ColorConvertU32ToFloat4(result == 2 ? COLOR_GREEN : COLOR_RED);
+        if (result == 2) ImGui::TextColored(color, "Correct! %s or %s.", names[answer[0]], names[answer[1]]);
+        else ImGui::TextColored(color, "Not quite: it's %s or %s.", names[answer[0]], names[answer[1]]);
+        ImGui::Text("The wisp went to %s.", names[nextWisp]);
+    }
+    ImGui::Spacing();
+
+    // the 8 spots, 4 per row
+    for (int i = 0; i < 8; i++) {
+        if (i % 4) ImGui::SameLine();
+        std::string label = names[i];
+        ImU32 color = COLOR_BLUE;
+        bool disabled = false;
+        if (i == current) {
+            label = std::string(ICON_FA_LOCATION_DOT " ") + label;
+            color = COLOR_GREEN;
+            disabled = true;
+        }
+        else if (Shot(i)) {
+            color = COLOR_GREY;
+            disabled = true;
+        }
+        if (!checked) {
+            if (picks[0] == i || picks[1] == i) color = COLOR_GREEN;
+        }
+        else if (!done) {
+            if (answer[0] == i || answer[1] == i) color = COLOR_GREEN;
+            else if (picks[0] == i || picks[1] == i) color = COLOR_RED;
+            if (nextWisp == i) label += "  " ICON_FA_STAR;
+        }
+        label += "##Wisp" + std::to_string(i);
+        const bool clickable = !disabled && !checked && !done;
+        if (Button::RenderSingle(label, ImVec2(150, 40), !clickable, color) && clickable) {
+            if (picks[0] == i) {
+                picks[0] = picks[1];
+                picks[1] = -1;
+            }
+            else if (picks[1] == i) {
+                picks[1] = -1;
+            }
+            else if (picks[0] < 0) {
+                picks[0] = i;
+            }
+            else {
+                picks[1] = i;
+                Check();
+            }
+        }
+    }
+    ImGui::Spacing();
+
+    if (checked && !done) {
+        if (Button::RenderSingle(ICON_FA_ARROW_RIGHT " Shoot It##WispNext", ImVec2(150, 30))) {
+            Next();
+        }
+        ImGui::SameLine();
+    }
+    if (Button::RenderSingle(ICON_FA_ROTATE " New Run##WispNew", ImVec2(150, 30))) {
+        NewRun();
+    }
+    ImGui::SameLine();
+    if (Button::RenderSingle("Reset Score##WispScore", ImVec2(150, 30))) {
+        correct = total = streak = bestStreak = 0;
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Show Wisp Table", &showTable);
+
+    if (showTable) {
+        ImGui::Spacing();
+        ImGui::TextDisabled("50/50s read left to right - if one has already been shot, skip it");
+        if (ImGui::BeginTable("##WispTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_NoHostExtendX)) {
+            ImGui::TableSetupColumn("Wisp Shot", ImGuiTableColumnFlags_WidthFixed, 150.0f);
+            ImGui::TableSetupColumn("Next Wisp", ImGuiTableColumnFlags_WidthFixed, 380.0f);
+            ImGui::TableHeadersRow();
+            for (int i = 0; i < 8; i++) {
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::TextUnformatted(names[i]);
+                ImGui::TableSetColumnIndex(1);
+                ImGui::Text("%s, %s, %s, %s", names[rows[i][0]], names[rows[i][1]], names[rows[i][2]], names[rows[i][3]]);
+            }
+            ImGui::EndTable();
+        }
+    }
+
+    ImGui::Unindent(25.0f);
+    ImGui::Dummy(ImVec2(0, 20));
+    ImGui::EndChild();
+}
+}
+
+void WispTrainerFunc()
+{
+    WispDrill::Render();
 }
 
 // Miscellaneous > Credits
@@ -4808,6 +5077,8 @@ void CreditsFunc()
         "Made the Rev Practice Tool: the Revelations soft patch and the Arnies, Bones, Eggs, Boss 1, Basketball and Boss 2 practices.");
     CreditCard("Margz", "Origins",
         "Made the Origins Soft Patch and Fire Enter Practice.");
+    CreditCard("Luisete", "Der Eisendrache",
+        "Made the DE SR Trainer. Bow Lineups practice is built from his aim trainer.");
     CreditCard("Vinnie / Claude", "Updates",
         "Updated the practice tool: Moon patches and splits, Soft Patch Gums, the merged Rev and Origins patches, appearance options, fixes and more.");
     ImGui::Unindent(25.0f);
@@ -5012,7 +5283,7 @@ RenderWindow SidebarToWindow(int sidebarIndex)
         // In Game, Resources and Practice Tool pages (Round Options is a tab in Zombie Options and
         // Powerup Options a tab in Player Options, so they have no sidebar entry)
         static const RenderWindow pages[] = { PlayerOptions, ZombieOptions, EggStepOptions, CraftableOptions, BlockerOptions,
-            ZombieCalculator, CodeGuides, GKValveSolver, MoonMen, ToolSettings, InstallLocation, Credits };
+            ZombieCalculator, CodeGuides, GKValveSolver, WispTrainer, MoonMen, ToolSettings, InstallLocation, Credits };
         int page = sidebarIndex - 5;
         if (page < 0 || page >= static_cast<int>(sizeof(pages) / sizeof(pages[0]))) return PlayerOptions;
         return pages[page];

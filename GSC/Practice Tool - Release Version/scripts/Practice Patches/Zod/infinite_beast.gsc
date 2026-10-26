@@ -15,6 +15,13 @@ InfiniteBeastStart(hud = 1)
     self thread InfiniteLives();
     if(hud)
     {
+        // the practice patch also sets up the whole map (Spawner Debug reuses this with hud = 0 and
+        // does its own setup): every door and beast door, every power box, all perks, and Pack-a-Punch
+        // (the 4 rituals + the PaP ritual, so the PaP is up)
+        self thread OpenAllDoors();
+        self thread ActivateAllPower();
+        self thread GiveAllPerks();
+        self thread FinishRitual(4);
         self thread WaypointSetup(1);
     }
 }

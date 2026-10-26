@@ -390,6 +390,7 @@ namespace BO3PT
     void NotifyGame(const std::vector<int>& passList)
     {
         if (!GUIState::IsStateSet(Active)) {
+            WLog::Log(WMT::Warning, "In Game command ignored: the tool is toggled off");
             return;
         }
         std::string outData;
@@ -398,11 +399,19 @@ namespace BO3PT
         }
 
         HANDLE pipe = CreateFileA("\\\\.\\pipe\\t7Compiler", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
-        if (!pipe) {
+        // CreateFileA fails with INVALID_HANDLE_VALUE, not NULL, so the old check never caught it
+        if (pipe == INVALID_HANDLE_VALUE || pipe == NULL) {
+            WLog::Log(WMT::Error, "Couldn't reach the game to send \"" + outData + "\" (error " + std::to_string(GetLastError()) + ") - is the tool injected and a game loaded?");
             return;
         }
 
-        WriteFile(pipe, outData.c_str(), static_cast<DWORD>(outData.size()), nullptr, NULL);
+        DWORD written = 0;
+        if (!WriteFile(pipe, outData.c_str(), static_cast<DWORD>(outData.size()), &written, NULL)) {
+            WLog::Log(WMT::Error, "Sending \"" + outData + "\" to the game failed (error " + std::to_string(GetLastError()) + ")");
+        }
+        else {
+            WLog::Log(WMT::Debug, "Sent to game: " + outData);
+        }
         CloseHandle(pipe);
     }
 
@@ -1563,12 +1572,14 @@ namespace BO3PT
             rapidjson::Value& settings = builder.AddObject(builder.GetDocument(), "Settings");
             settings.AddMember("In Game Timer", false, builder.GetAllocator());
             settings.AddMember("In Game Round Timer", false, builder.GetAllocator());
+            settings.AddMember("Box Hits", false, builder.GetAllocator());
             settings.AddMember("Amount of Splits", 0, builder.GetAllocator());
             settings.AddMember("Map Index", 0, builder.GetAllocator());
             settings.AddMember("Split Type", 0, builder.GetAllocator());
 
             newPreset.m_IGT = false;
             newPreset.m_IGRT = false;
+            newPreset.m_BoxHits = false;
             newPreset.m_NumSplits = 0;
             newPreset.m_Map = 0;
             newPreset.m_SplitType = 0;
@@ -1604,6 +1615,8 @@ namespace BO3PT
         rapidjson::Value& settings = builder.AddObject(builder.GetDocument(), "Settings");
         settings.AddMember("In Game Timer", preset.m_IGT, builder.GetAllocator());
         settings.AddMember("In Game Round Timer", preset.m_IGRT, builder.GetAllocator());
+        // in-game box hit counter (the game script only shows it on Revelations and Moon)
+        settings.AddMember("Box Hits", preset.m_BoxHits, builder.GetAllocator());
         settings.AddMember("Amount of Splits", preset.m_NumSplits, builder.GetAllocator());
         settings.AddMember("Map Index", preset.m_Map, builder.GetAllocator());
         settings.AddMember("Split Type", preset.m_SplitType, builder.GetAllocator());
@@ -1972,6 +1985,11 @@ namespace BO3PT
                 case hashstr("In Game Round Timer"):
                     if (value.IsBool()) {
                         returnPreset.m_IGRT = value.GetBool();
+                    }
+                    break;
+                case hashstr("Box Hits"):
+                    if (value.IsBool()) {
+                        returnPreset.m_BoxHits = value.GetBool();
                     }
                     break;
                 case hashstr("Amount of Splits"):

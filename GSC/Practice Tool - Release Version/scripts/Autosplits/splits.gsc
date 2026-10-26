@@ -14,6 +14,10 @@ LoadSplits()
 
     if(maps[map] != level.script) return;
 
+    // Revelations / Moon: box hit counter (level vars start fresh on every reset, so it starts at 0)
+    box_hits = compiler::getsplitvalue("Settings", "Box Hits");
+    if(box_hits && (level.script == "zm_genesis" || level.script == "zm_moon")) thread RunBoxHits();
+
     level.num_splits = split_size + 1;
 
     split_funcs = [];
@@ -196,6 +200,39 @@ RunIGRT()
     thread ManageInGameRoundTimer(round_timer);
 }
 
+// Counts every Mystery Box hit (each time a box opens from being bought, fire sale boxes included)
+RunBoxHits()
+{
+    level.box_hits = 0;
+    WaitFadeIn();
+    counter = InitHud(0);
+    counter.alignX = "right";
+    counter.horzAlign = "user_right";
+    counter.x = -15;
+    counter.y = 15;
+    counter.label = &"^3Box Hits: ^2";
+    counter SetValue(0);
+    counter.alpha = 1;
+    while(!IsDefined(level.chests)) wait 0.05;
+    foreach(chest in level.chests) chest thread WatchBoxHits(counter);
+}
+
+WatchBoxHits(counter)
+{
+    was_open = IsTrue(self._box_open);
+    for(;;)
+    {
+        is_open = IsTrue(self._box_open);
+        if(is_open && !was_open)
+        {
+            level.box_hits++;
+            counter SetValue(level.box_hits);
+        }
+        was_open = is_open;
+        wait 0.05;
+    }
+}
+
 AddIGTSplit(label)
 {
     level.in_game_splits[level.last_split_added] = SpawnStruct();
@@ -300,6 +337,23 @@ Split()
     if(!IsDefined(level.current_split_num)) level.current_split_num = 0;
     SetDvar("probation_league_matchHistoryWindow", level.current_split_num);
     level.current_split_num++;
+}
+
+// Round timer for practice patches, top right (same timing as the in-game round timer above)
+PracticeRoundTimer(y = 35)
+{
+    timer = NewHudElem();
+    timer.alignx = "right";
+    timer.aligny = "top";
+    timer.horzalign = "user_right";
+    timer.vertalign = "user_top";
+    timer.x = -15;
+    timer.y = y;
+    timer.fontscale = 1.5;
+    timer.hidewheninmenu = 1;
+    timer.label = &"^3Round Time: ^2";
+    timer SetTenthsTimerUp(0.05);
+    ManageInGameRoundTimer(timer);
 }
 
 ManageInGameRoundTimer(round_timer)

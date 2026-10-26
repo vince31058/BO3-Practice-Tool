@@ -43,7 +43,7 @@ InitPracticePatches()
     level.practice_patches = Array();
     level.practice_patches["zm_zod"] = Array(::ZodSoftPatch, ::InfiniteBeastStart, ::OvumsPractice, ::FlagsPractice);
     level.practice_patches["zm_factory"] = Array(::FlytrapPractice);
-    level.practice_patches["zm_castle"] = Array(::CastleSoftPatch, ::Wisp2Practice, ::KeeperPractice, ::LightningBowShotsPractice, ::FireBowShotsPractice);
+    level.practice_patches["zm_castle"] = Array(::CastleSoftPatch, ::Wisp2Practice, ::KeeperPractice, ::FireBowShotsPractice, ::WispOrderPractice, ::BowLineupsPractice);
     level.practice_patches["zm_island"] = Array(::IslandSoftPatch);
     level.practice_patches["zm_stalingrad"] = Array(::StalingradSoftPatch, ::LockdownPractice, ::ChallengesPractice, ::GershQuoteSkipPractice, ::BossQuoteSkipPractice);
     level.practice_patches["zm_genesis"] = Array(::GenesisSoftPatch, ::ArniesPractice, ::BonesPractice, ::EggsPractice, ::Boss1Practice, ::BasketballPractice, ::Boss2Practice, ::SquidShardsPractice);
@@ -53,11 +53,11 @@ InitPracticePatches()
 
     // Who made each patch (same order as above), shown in the bottom right corner by ShowPatchCredit
     level.practice_patch_credits = Array();
-    level.practice_patch_credits["zm_zod"] = Array("Scrappy", "Scrappy", "Scrappy", "Scrappy");
+    level.practice_patch_credits["zm_zod"] = Array("Scrappy", "Scrappy and Vinnie", "Scrappy", "Scrappy and Vinnie");
     level.practice_patch_credits["zm_factory"] = Array("Scrappy");
-    level.practice_patch_credits["zm_castle"] = Array("Scrappy", "Scrappy", "Scrappy", "Scrappy", "Scrappy");
+    level.practice_patch_credits["zm_castle"] = Array("Scrappy", "Scrappy", "Scrappy", "Scrappy", "Vinnie", "Luisete and Vinnie");
     level.practice_patch_credits["zm_island"] = Array("Scrappy");
-    level.practice_patch_credits["zm_stalingrad"] = Array("Scrappy", "Scrappy", "Scrappy", "Scrappy", "Scrappy");
+    level.practice_patch_credits["zm_stalingrad"] = Array("Scrappy", "Scrappy and Vinnie", "Scrappy", "Scrappy", "Scrappy");
     level.practice_patch_credits["zm_genesis"] = Array("Cbrnn and Vinnie", "Cbrnn and Vinnie", "Cbrnn and Vinnie", "Cbrnn and Vinnie", "Cbrnn and Vinnie", "Cbrnn and Vinnie", "Cbrnn and Vinnie", "Scrappy");
     level.practice_patch_credits["zm_moon"] = Array("Vinnie", "Vinnie");
     level.practice_patch_credits["zm_tomb"] = Array("Margz and Vinnie", "Scrappy", "Scrappy", "Scrappy", "Scrappy", "Scrappy", "Margz and Vinnie");
@@ -85,13 +85,25 @@ ShowPatchCredit(map, index)
     hud SetText("^6By " + level.practice_patch_credits[map][index]);
 }
 
+StartAppServer()
+{
+    level.pt_server_state = "clearing";
+    compiler::resetqueue();
+    level.pt_server_state = "starting";
+    compiler::startserver();
+    level.pt_server_state = "running";
+}
+
 WatchInterface()
 {
     level endon("disconnect");
     level endon("end_server");
 
-    compiler::resetqueue();
-    compiler::startserver();
+    // Starting the app connection runs in its own thread: if it errors (for example because the
+    // connection from an earlier game is still open) only that thread stops, and the command loop
+    // below keeps reading.
+    level.pt_server_state = "not started";
+    level thread StartAppServer();
 
     level flag::wait_till("initial_blackscreen_passed");
 
