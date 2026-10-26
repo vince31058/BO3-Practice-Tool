@@ -2020,11 +2020,19 @@ namespace BO3PT
                     // Moon splits were renamed; presets saved with the old names keep working
                     static const std::unordered_map<std::string, std::string> renamedSplits = {
                         { "Simon Says", "Samantha Says" }, { "Security Override", "Terminals" }, { "Focus", "Vril Sphere" },
-                        { "First Tank", "Canister #1" }, { "Second Tank", "Canister #2" }, { "Moon End", "Earth Boom" } };
+                        { "First Tank", "Canister #1" }, { "Second Tank", "Canister #2" } };
                     std::string splitName = it->name.GetString();
                     auto renamed = renamedSplits.find(splitName);
                     if (renamed != renamedSplits.end()) {
                         splitName = renamed->second;
+                    }
+                    // Moon's "Earth Boom" (once "Moon End") split was removed: the run's automatic Egg End
+                    // split is the same moment. Presets that still have it just drop it.
+                    if (splitName == "Earth Boom" || splitName == "Moon End") {
+                        if (returnPreset.m_NumSplits > 0) {
+                            returnPreset.m_NumSplits--;
+                        }
+                        continue;
                     }
                     returnPreset.m_Splits.push_back({ splitName, it->value.GetInt() });
                 }

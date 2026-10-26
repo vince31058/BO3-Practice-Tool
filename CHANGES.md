@@ -159,3 +159,13 @@ The tool now injects into both the downpatched BlackOps3.exe (March 2023) and th
 ### Known issues
 - Charged Lightning Bow shots can still crash the game in Wisp 2 and Keeper Practice. Both patches show a warning. A rework is planned.
 - In Keeper Practice, the Ragnarok piece and the gold rod sometimes won't pick up the normal way. Pressing use near them still picks them up.
+
+## v1.1.1
+
+### Changes
+- **Box Hits counter** moved to the bottom left, just above your points.
+- **Moon autosplits:** removed the "Earth Boom" split. The run's automatic Egg End split already ends the run when the Earth explodes. Presets that had Earth Boom drop it automatically.
+
+### Fixes
+- **Moon Egg End** could split about a minute after the rockets started rising instead of when the Earth explodes (in runs where the egg was done before the second Samantha Says). It now always lands on the explosion.
+- **Moon "Vril Sphere" split** now splits when the sphere reaches the pyramid (it was splitting when the vril generator finished charging).

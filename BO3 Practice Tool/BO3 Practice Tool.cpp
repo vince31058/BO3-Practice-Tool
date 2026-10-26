@@ -97,7 +97,7 @@ static MSSelection sidebarSelections({ {{ "Player Loadouts", "Autosplits", "Prac
 static MSSelection weaponSelections;
 static std::vector<MSSelection> autosplitSelections;
 
-static std::string internalVersion = "1.1.0"; // major.addition.fix: new feature -> middle number (+ reset the last), fix/small change -> last number. Release tag is v + this
+static std::string internalVersion = "1.1.1"; // major.addition.fix: new feature -> middle number (+ reset the last), fix/small change -> last number. Release tag is v + this
 static Walnut::Image* discordIcon;
 static Walnut::Image* weaponWarning;
 

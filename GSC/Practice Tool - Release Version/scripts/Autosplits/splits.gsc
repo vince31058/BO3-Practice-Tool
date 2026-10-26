@@ -34,7 +34,7 @@ LoadSplits()
     split_funcs["zm_genesis"] = Array(::SplitGenSpawn, ::SplitGenDE, ::SplitGenVerruckt, ::SplitGenMob, ::SplitKeeperStart, ::SplitEnterBeast, ::SplitLeaveBeastMob, ::SplitLeaveBeastVerruckt, ::SplitLeaveBeastDE, ::SplitLeaveBeastSpawn, ::SplitReelPickup1,
     ::SplitReelPlace1, ::SplitReelPickup2, ::SplitReelPlace2, ::SplitReelPickup3, ::SplitReelPlace3, ::SplitHouseTP, ::SplitEgg1, ::SplitEgg2, ::SplitEgg3, ::SplitEgg4, ::SplitRune1, ::SplitRune2, ::SplitRune3, ::SplitRune4, ::SplitBoss1, ::SplitSymbols,
     ::SplitBossRush, ::SplitBoss2);
-    split_funcs["zm_moon"] = Array(::SplitMoonPowerOn, ::SplitMoonSimonSays, ::SplitMoonSecurityOverride, ::SplitMoonFocus, ::SplitMoonFirstTank, ::SplitMoonSecondTank, ::WaitMoonEnd);
+    split_funcs["zm_moon"] = Array(::SplitMoonPowerOn, ::SplitMoonSimonSays, ::SplitMoonSecurityOverride, ::SplitMoonFocus, ::SplitMoonFirstTank, ::SplitMoonSecondTank);
     split_funcs["zm_tomb"] = Array(::SplitIceCraft, ::SplitWindCraft, ::SplitFireCraft, ::SplitLightningCraft, ::SplitUpgrade, ::SplitBoxes, ::SplitFists,
     ::SplitIceEnter, ::SplitWindEnter, ::SplitFireEnter, ::SplitLightningEnter, ::SplitIceLeave, ::SplitWindLeave, ::SplitFireLeave, ::SplitLightningLeave);
     split_labels["zm_zod"] = Array(&"Magician Ritual: ", &"Femme Ritual: ", &"Detective Ritual: ", &"Boxer Ritual: ", &"PAP Ritual: ", &"Canals Rift: ", &"Footlight Rift: ", &"Waterfront Rift: ", &"Rift Canals: ", &"Rift Footlight: ", &"Rift Waterfront: ",
@@ -48,7 +48,7 @@ LoadSplits()
     split_labels["zm_genesis"] = Array(&"Spawn Gen: ", &"DE Gen: ", &"Verruckt Gen: ", &"Mob Gen: ", &"Keeper Start: ", &"Enter Beast: ", &"Exit Beast Mob: ", &"Exit Beast Verruckt: ", &"Exit Beast DE: ", &"Exit Beast Spawn: ", &"Pickup Reel 1: ",
     &"Place Reel 1: ", &"Pickup Reel 2: ", &"Place Reel 2: ", &"Pickup Reel 3: ", &"Place Reel 3: ", &"House: ", &"Egg 1: ", &"Egg 2: ", &"Egg 3: ", &"Egg 4: ", &"Rune 1: ", &"Rune 2: ", &"Rune 3: ", &"Rune 4: ",
     &"Boss 1: ", &"Symbols: ", &"Basketball: ", &"Boss 2: ");
-    split_labels["zm_moon"] = Array(&"Power On: ", &"Samantha Says: ", &"Terminals: ", &"Vril Sphere: ", &"Canister #1: ", &"Canister #2: ", &"Earth Boom: ");
+    split_labels["zm_moon"] = Array(&"Power On: ", &"Samantha Says: ", &"Terminals: ", &"Vril Sphere: ", &"Canister #1: ", &"Canister #2: ");
     split_labels["zm_tomb"] = Array(&"Ice Staff: ", &"Wind Staff: ", &"Fire Staff: ", &"Lightning Staff: ", &"Upgrade: ", &"Boxes: ", &"Fists: ",
     &"Ice Enter: ", &"Wind Enter: ", &"Fire Enter: ", &"Lightning Enter: ", &"Ice Leave: ", &"Wind Leave: ", &"Fire Leave: ", &"Lightning Leave: ");
     active_funcs = [];
@@ -206,10 +206,13 @@ RunBoxHits()
     level.box_hits = 0;
     WaitFadeIn();
     counter = InitHud(0);
-    counter.alignX = "right";
-    counter.horzAlign = "user_right";
-    counter.x = -15;
-    counter.y = 15;
+    // bottom left, just above the player's points (move with x / y if it needs nudging)
+    counter.alignX = "left";
+    counter.alignY = "bottom";
+    counter.horzAlign = "user_left";
+    counter.vertAlign = "user_bottom";
+    counter.x = 15;
+    counter.y = -130;
     counter.label = &"^3Box Hits: ^2";
     counter SetValue(0);
     counter.alpha = 1;

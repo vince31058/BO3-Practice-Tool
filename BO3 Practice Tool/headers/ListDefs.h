@@ -839,7 +839,7 @@ inline AutosplitLists autosplits = {
 		}},
 		{ "zm_moon", {
 			{ "Moon EE Start", { "Power On", "Samantha Says", "Terminals", "Vril Sphere" } },
-			{ "Moon EE End", { "Canister #1", "Canister #2", "Earth Boom" } }
+			{ "Moon EE End", { "Canister #1", "Canister #2" } }
 		}},
 		{ "zm_tomb", {
 			{ "Staff", { "Ice Craft", "Wind Craft", "Fire Craft", "Lightning Craft" } },
