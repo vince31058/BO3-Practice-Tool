@@ -210,6 +210,8 @@ namespace BO3PT
 			}
 			if (hotkeyToAssign && hotkey.second.index == hotkeyToAssign->second.index)
 				continue;
+			if (!inGameHotkeysEnabled && hotkey.second.splitGroup == "In Game")
+				continue;
 
 			if (usedBinds.find(hotkey.second.keyNames) == usedBinds.end())
 				{

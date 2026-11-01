@@ -133,9 +133,19 @@ std::mutex asyncSearchLock;
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
 {
 	while (g_ApplicationRunning) {
-		char buf[256];
-		GetCurrentDirectoryA(256, buf);
-		selfDirectory = buf;
+		// The tool's own folder is where the exe is, not the working directory: a shortcut whose
+		// "Start in" is another folder made the tool miss its fonts/images (black window) and made the
+		// updater write the new exe somewhere else. Also make it the working directory, since some
+		// files are still opened by relative path.
+		char buf[MAX_PATH] = { 0 };
+		if (GetModuleFileNameA(NULL, buf, MAX_PATH) > 0) {
+			selfDirectory = std::filesystem::path(buf).parent_path().string();
+			SetCurrentDirectoryA(selfDirectory.c_str());
+		}
+		else {
+			GetCurrentDirectoryA(MAX_PATH, buf);
+			selfDirectory = buf;
+		}
 
         WLog::InitLogger(selfDirectory + "/log.txt");
 		WLog::Log(WMT::Success, "Practice Tool Startup");
@@ -778,6 +788,8 @@ bool CheckUpdate()
             WLog::Log(WMT::Error, "Couldn't remove old exe with error code: " + std::error_code(errno, std::system_category()).message());
         }
     }
+    std::error_code leftoverError;
+    std::filesystem::remove(selfDirectory + "/BO3 Practice Tool.new.exe", leftoverError); // from an update that didn't finish
     WLog::Log(WMT::Info, "Checking for updates");
 
     CURL* curl = curl_easy_init();

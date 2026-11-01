@@ -19,6 +19,17 @@
 #include <thread>
 #include <set>
 #include <regex>
+#include <array>
+#include <map>
+#include <mutex>
+#include <random>
+#include <chrono>
+#include <cctype>
+#include <cstdio>
+
+// SHA-256 for the session hashes (Windows CNG)
+#include <bcrypt.h>
+#pragma comment(lib, "bcrypt.lib")
 
 using WLog = Walnut::Logger;
 using WMT = Walnut::MessageType;
@@ -415,6 +426,407 @@ namespace BO3PT
         CloseHandle(pipe);
     }
 
+#pragma region SessionHashes
+    // Session hashes, shown in game by Mod Source\scripts\session_hashes.gsc whenever the tool is on.
+    // GSC can't open files, so the app hashes (SHA-256):
+    //   - the in-game script it injects (Practice Tool\Compiler\Practice Tool Vin.gsc)
+    //   - every installed mod and custom map: mods\<name>\zone, usermaps\<name>\zone and every Steam Workshop
+    //     item (steamapps\workshop\content\311210\<id>). A folder's hash is the SHA-256 of one
+    //     "<file name>:<file sha256>\n" line per .ff and .dll file in it (names in lowercase, sorted), so it covers
+    //     the scripts (.ff) and any code DLLs a mod ships.
+    // and writes them to Practice Tool\Settings\Session Hashes.txt as comma separated numbers, because
+    // compiler::readsettings only reads numbers. Positions start at 1:
+    //   1 format (1)   2-3 random nonce (16 bit)   4-7 tool script hash (first 8 bytes, 16 bits per number)
+    //   8 app version (major*10000 + minor*100 + fix)   9 game build (0 unknown, 1 downpatched 2023, 2 Steam 2026)
+    //   10 entry count, then 6 numbers per entry: name key, kind (1 mod, 2 map), hash (first 8 bytes, 4 numbers)
+    //   and last the end marker 7777777, so the game can tell the file is complete
+    // Workshop items are listed under both their folder name and their Workshop ID, since either can be fs_game.
+    // The full hashes go to "Session Hashes (full).txt" next to it, to publish / compare known-good hashes.
+    // Written when the tool is turned on (new nonce) and when a map loads (only if a hash changed, so the file
+    // isn't being replaced while the game reads it); file hashes are cached by size + time in
+    // Settings\Hash Cache.txt (in the app's folder) so big map files are only read again when they change.
+
+    struct SessionEntry {
+        std::string name;
+        int kind = 1;
+        std::string hash;
+        std::string where;
+    };
+
+    struct HashCacheEntry {
+        uintmax_t size = 0;
+        long long time = 0;
+        std::string hash;
+    };
+
+    static std::map<std::string, HashCacheEntry> s_HashCache;
+    static bool s_HashCacheLoaded = false;
+    static std::vector<SessionEntry> s_LastSessionEntries;
+    static int s_SessionNonce[2] = { 0, 0 };
+    static std::string s_LastSessionData;
+
+    static std::string LowerCase(std::string text)
+    {
+        for (char& c : text) {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        return text;
+    }
+
+    // Must match PtNameKey in session_hashes.gsc
+    static uint32_t SessionNameKey(const std::string& name)
+    {
+        static const std::string chars = "abcdefghijklmnopqrstuvwxyz0123456789_-. ";
+        uint64_t key = 0;
+        for (char c : LowerCase(name)) {
+            size_t pos = chars.find(c);
+            uint64_t value = pos == std::string::npos ? 41 : pos + 1;
+            key = (key * 42 + value) % 50000017;
+        }
+        return static_cast<uint32_t>(key);
+    }
+
+    static std::string ToHex(const uint8_t* data, size_t size)
+    {
+        static const char* digits = "0123456789abcdef";
+        std::string hex;
+        for (size_t i = 0; i < size; i++) {
+            hex += digits[data[i] >> 4];
+            hex += digits[data[i] & 15];
+        }
+        return hex;
+    }
+
+    // SHA-256 of whatever feed() passes to the hash, "" on failure
+    static std::string Sha256(const std::function<bool(BCRYPT_HASH_HANDLE)>& feed)
+    {
+        BCRYPT_ALG_HANDLE alg = NULL;
+        BCRYPT_HASH_HANDLE hash = NULL;
+        std::string result;
+        if (!BCRYPT_SUCCESS(BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA256_ALGORITHM, NULL, 0))) {
+            return result;
+        }
+        if (BCRYPT_SUCCESS(BCryptCreateHash(alg, &hash, NULL, 0, NULL, 0, 0))) {
+            uint8_t digest[32] = { 0 };
+            if (feed(hash) && BCRYPT_SUCCESS(BCryptFinishHash(hash, digest, sizeof(digest), 0))) {
+                result = ToHex(digest, sizeof(digest));
+            }
+            BCryptDestroyHash(hash);
+        }
+        BCryptCloseAlgorithmProvider(alg, 0);
+        return result;
+    }
+
+    static std::string Sha256String(const std::string& text)
+    {
+        return Sha256([&](BCRYPT_HASH_HANDLE hash) {
+            return BCRYPT_SUCCESS(BCryptHashData(hash, reinterpret_cast<PUCHAR>(const_cast<char*>(text.data())), static_cast<ULONG>(text.size()), 0));
+        });
+    }
+
+    static std::string Sha256File(const std::filesystem::path& path)
+    {
+        return Sha256([&](BCRYPT_HASH_HANDLE hash) {
+            std::ifstream file(path, std::ios::binary);
+            if (!file.is_open()) {
+                return false;
+            }
+            std::vector<char> buffer(1 << 20);
+            while (file) {
+                file.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+                std::streamsize got = file.gcount();
+                if (got > 0 && !BCRYPT_SUCCESS(BCryptHashData(hash, reinterpret_cast<PUCHAR>(buffer.data()), static_cast<ULONG>(got), 0))) {
+                    return false;
+                }
+            }
+            return !file.bad();
+        });
+    }
+
+    static std::string HashCachePath()
+    {
+        return selfDirectory + "\\Settings\\Hash Cache.txt";
+    }
+
+    // one line per file: size|time|sha256|path
+    static void LoadHashCache()
+    {
+        s_HashCacheLoaded = true;
+        std::ifstream file(HashCachePath());
+        std::string line;
+        while (std::getline(file, line)) {
+            size_t a = line.find('|');
+            size_t b = a == std::string::npos ? a : line.find('|', a + 1);
+            size_t c = b == std::string::npos ? b : line.find('|', b + 1);
+            if (c == std::string::npos) {
+                continue;
+            }
+            try {
+                HashCacheEntry entry;
+                entry.size = std::stoull(line.substr(0, a));
+                entry.time = std::stoll(line.substr(a + 1, b - a - 1));
+                entry.hash = line.substr(b + 1, c - b - 1);
+                if (entry.hash.size() == 64) {
+                    s_HashCache[line.substr(c + 1)] = entry;
+                }
+            }
+            catch (...) {
+            }
+        }
+    }
+
+    static void SaveHashCache()
+    {
+        std::ofstream file(HashCachePath(), std::ios::trunc);
+        for (const auto& [path, entry] : s_HashCache) {
+            file << entry.size << "|" << entry.time << "|" << entry.hash << "|" << path << "\n";
+        }
+    }
+
+    static std::string CachedFileHash(const std::filesystem::path& path)
+    {
+        std::error_code ec;
+        uintmax_t size = std::filesystem::file_size(path, ec);
+        if (ec) {
+            return "";
+        }
+        auto writeTime = std::filesystem::last_write_time(path, ec);
+        if (ec) {
+            return "";
+        }
+        long long stamp = static_cast<long long>(writeTime.time_since_epoch().count());
+        std::string key = path.string();
+        auto it = s_HashCache.find(key);
+        if (it != s_HashCache.end() && it->second.size == size && it->second.time == stamp) {
+            return it->second.hash;
+        }
+        std::string hash = Sha256File(path);
+        if (!hash.empty()) {
+            s_HashCache[key] = { size, stamp, hash };
+        }
+        return hash;
+    }
+
+    // "" when the folder has no .ff / .dll files or one can't be read
+    static std::string FolderHash(const std::filesystem::path& folder)
+    {
+        std::vector<std::pair<std::string, std::filesystem::path>> files;
+        std::error_code ec;
+        if (!std::filesystem::is_directory(folder, ec)) {
+            return "";
+        }
+        for (const auto& entry : std::filesystem::directory_iterator(folder, ec)) {
+            if (!entry.is_regular_file(ec)) {
+                continue;
+            }
+            std::string ext = LowerCase(entry.path().extension().string());
+            if (ext != ".ff" && ext != ".dll") {
+                continue;
+            }
+            files.push_back({ LowerCase(entry.path().filename().string()), entry.path() });
+        }
+        if (files.empty()) {
+            return "";
+        }
+        std::sort(files.begin(), files.end());
+        std::string list;
+        for (const auto& [name, path] : files) {
+            std::string hash = CachedFileHash(path);
+            if (hash.empty()) {
+                return "";
+            }
+            list += name + ":" + hash + "\n";
+        }
+        return Sha256String(list);
+    }
+
+    // mods\<name>\zone or usermaps\<name>\zone
+    static void AddLocalFolders(const std::filesystem::path& root, int kind, std::vector<SessionEntry>& out)
+    {
+        std::error_code ec;
+        if (!std::filesystem::is_directory(root, ec)) {
+            return;
+        }
+        for (const auto& dir : std::filesystem::directory_iterator(root, ec)) {
+            if (!dir.is_directory(ec)) {
+                continue;
+            }
+            std::string hash = FolderHash(dir.path() / "zone");
+            if (!hash.empty()) {
+                out.push_back({ dir.path().filename().string(), kind, hash, dir.path().string() });
+            }
+        }
+    }
+
+    static std::string JsonStringField(const std::string& json, const std::string& field)
+    {
+        std::smatch match;
+        if (std::regex_search(json, match, std::regex("\"" + field + "\"\\s*:\\s*\"([^\"]*)\""))) {
+            return match[1].str();
+        }
+        return "";
+    }
+
+    // steamapps\workshop\content\311210\<id>: the files sit in the item folder, workshop.json says its
+    // FolderName (what the game calls it) and Type ("mod" or "map")
+    static void AddWorkshopItems(const std::filesystem::path& root, std::vector<SessionEntry>& out)
+    {
+        std::error_code ec;
+        if (!std::filesystem::is_directory(root, ec)) {
+            return;
+        }
+        for (const auto& dir : std::filesystem::directory_iterator(root, ec)) {
+            if (!dir.is_directory(ec)) {
+                continue;
+            }
+            std::string id = dir.path().filename().string();
+            std::ifstream file(dir.path() / "workshop.json");
+            std::string json((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+            std::string folderName = JsonStringField(json, "FolderName");
+            std::string type = LowerCase(JsonStringField(json, "Type"));
+            int kind = 1;
+            if (type == "map") {
+                kind = 2;
+            }
+            else if (type.empty()) {
+                std::string prefix = LowerCase(folderName.substr(0, 3));
+                if (prefix == "zm_" || prefix == "mp_" || prefix == "cp_") {
+                    kind = 2;
+                }
+            }
+            std::string hash = FolderHash(dir.path());
+            if (hash.empty()) {
+                hash = FolderHash(dir.path() / "zone");
+            }
+            if (hash.empty()) {
+                continue;
+            }
+            if (!folderName.empty()) {
+                out.push_back({ folderName, kind, hash, dir.path().string() });
+            }
+            out.push_back({ id, kind, hash, dir.path().string() });
+        }
+    }
+
+    static std::filesystem::path WorkshopFolder()
+    {
+        // bo3Directory is ...\steamapps\common\Call of Duty Black Ops III (maybe with a slash at the end)
+        std::filesystem::path game(bo3Directory);
+        if (!game.has_filename()) {
+            game = game.parent_path();
+        }
+        return game.parent_path().parent_path() / "workshop" / "content" / "311210";
+    }
+
+    // 16 hex digits -> 4 numbers of 16 bits, or four -1 when there's no hash
+    static void AppendHashParts(std::string& out, const std::string& hash)
+    {
+        for (int i = 0; i < 4; i++) {
+            int part = -1;
+            if (hash.size() >= 16) {
+                part = std::stoi(hash.substr(i * 4, 4), nullptr, 16);
+            }
+            out += "," + std::to_string(part);
+        }
+    }
+
+    // false when nothing changed since the last write
+    static bool WriteSessionHashFiles(const std::string& toolHash, int gameBuild, const std::vector<SessionEntry>& entries)
+    {
+        std::string settingsDir = bo3Directory + "\\Practice Tool\\Settings";
+        std::error_code ec;
+        std::filesystem::create_directories(settingsDir, ec);
+
+        int major = 0, minor = 0, fix = 0;
+        sscanf_s(appVersion.c_str(), "%d.%d.%d", &major, &minor, &fix);
+
+        std::string data = "1," + std::to_string(s_SessionNonce[0]) + "," + std::to_string(s_SessionNonce[1]);
+        AppendHashParts(data, toolHash);
+        data += "," + std::to_string(major * 10000 + minor * 100 + fix);
+        data += "," + std::to_string(gameBuild);
+        data += "," + std::to_string(entries.size());
+        for (const SessionEntry& entry : entries) {
+            data += "," + std::to_string(SessionNameKey(entry.name)) + "," + std::to_string(entry.kind);
+            AppendHashParts(data, entry.hash);
+        }
+        data += ",7777777";
+
+        std::string target = settingsDir + "\\Session Hashes.txt";
+        if (data == s_LastSessionData && std::filesystem::exists(target, ec)) {
+            return false;
+        }
+
+        // write next to it and swap it in, so the game never sees a half written file. If the game has the file
+        // open the swap can fail for a moment: try again instead of writing over it in place.
+        std::string temp = target + ".tmp";
+        {
+            std::ofstream file(temp, std::ios::trunc | std::ios::binary);
+            file.write(data.c_str(), data.size());
+        }
+        bool swapped = false;
+        for (int attempt = 0; attempt < 40 && !swapped; attempt++) {
+            std::filesystem::rename(temp, target, ec);
+            swapped = !ec;
+            if (!swapped) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            }
+        }
+        if (!swapped) {
+            std::filesystem::remove(temp, ec);
+            WLog::Log(WMT::Error, "Couldn't replace Session Hashes.txt: " + ec.message());
+            return false;
+        }
+        s_LastSessionData = data;
+
+        std::ofstream full(settingsDir + "\\Session Hashes (full).txt", std::ios::trunc);
+        full << "Practice Tool v" << appVersion << " (" << MemState::BuildName(static_cast<GameBuild>(gameBuild)) << ")\n";
+        full << "Tool script  " << (toolHash.empty() ? "missing" : toolHash) << "\n\n";
+        for (const SessionEntry& entry : entries) {
+            full << (entry.kind == 2 ? "Map  " : "Mod  ") << entry.name << "  " << entry.hash << "  " << entry.where << "\n";
+        }
+        return true;
+    }
+
+    void WriteSessionHashes(int gameBuild, bool newSession)
+    {
+        static std::mutex writeMutex;
+        std::lock_guard<std::mutex> lock(writeMutex);
+        try {
+            auto started = std::chrono::steady_clock::now();
+            std::string toolHash = Sha256File(bo3Directory + "\\Practice Tool\\Compiler\\Practice Tool Vin.gsc");
+
+            if (newSession) {
+                // the tool was just turned on: new nonce, and a quick first write (last scan's mods) so a game
+                // that starts right now already has the tool hash
+                std::random_device random;
+                s_SessionNonce[0] = static_cast<int>(random() & 0xFFFF);
+                s_SessionNonce[1] = static_cast<int>(random() & 0xFFFF);
+                WriteSessionHashFiles(toolHash, gameBuild, s_LastSessionEntries);
+            }
+
+            if (!s_HashCacheLoaded) {
+                LoadHashCache();
+            }
+            std::vector<SessionEntry> entries;
+            std::filesystem::path game(bo3Directory);
+            AddLocalFolders(game / "mods", 1, entries);
+            AddLocalFolders(game / "usermaps", 2, entries);
+            AddWorkshopItems(WorkshopFolder(), entries);
+            s_LastSessionEntries = entries;
+
+            bool written = WriteSessionHashFiles(toolHash, gameBuild, entries) || newSession;
+            SaveHashCache();
+
+            long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
+            WLog::Log(WMT::Info, std::string(written ? "Session hashes written" : "Session hashes unchanged") + ": tool " + (toolHash.empty() ? std::string("missing") : toolHash.substr(0, 16)) + ", "
+                + std::to_string(entries.size()) + " mod/map entries (" + std::to_string(ms) + " ms)");
+        }
+        catch (const std::exception& e) {
+            WLog::Log(WMT::Error, std::string("Writing session hashes failed: ") + e.what());
+        }
+    }
+#pragma endregion
+
     void InjectTool(bool enable)
     {
         std::string compilerDir = bo3Directory + "/Practice Tool/Compiler";
@@ -445,6 +857,8 @@ namespace BO3PT
         LPSTR args;
         if (enable) {
             args = &ptPass[0];
+            // hashes for the in-game hash flash / anti-splice code (on both game builds)
+            std::thread(WriteSessionHashes, static_cast<int>(build), true).detach();
         }
         else {
             args = &nmPass[0];
@@ -525,7 +939,7 @@ namespace BO3PT
         CURL* curl = curl_easy_init();
         CURLcode res;
         FILE* file;
-        std::string filename = "BO3 Practice Tool.zip";
+        std::string filename = (selfDirectory.empty() ? std::string(".") : selfDirectory) + "/BO3 Practice Tool.zip";
         std::string ptexe;
 
         errno_t err = fopen_s(&file, filename.c_str(), "wb");
@@ -549,7 +963,8 @@ namespace BO3PT
 
         fclose(file);
 
-        std::filesystem::path output_directory("./");
+        // extract next to the exe (not the working directory: a shortcut's "Start in" folder can differ)
+        std::filesystem::path output_directory(selfDirectory.empty() ? std::string("./") : selfDirectory + "/");
         mz_zip_archive zip_archive;
         mz_zip_zero_struct(&zip_archive);
         if (!mz_zip_reader_init_file(&zip_archive, filename.c_str(), 0)) {
@@ -600,13 +1015,43 @@ namespace BO3PT
             WLog::Log(WMT::Info, "Extracting " + currentFile + " to " + output_file_path.string());
             std::filesystem::create_directories(output_file_path.parent_path(), ec);
 
-            if (currentFile == "BO3 Practice Tool.exe" && std::filesystem::exists(output_file_path)) {
-                // the running exe can't be overwritten, but it can be renamed; it's deleted on the next start
-                std::filesystem::remove(output_directory / "BO3 Practice Tool.old.exe", ec);
-                std::filesystem::rename(output_file_path, output_directory / "BO3 Practice Tool.old.exe", ec);
-                ptexe = output_file_path.string();
+            if (currentFile == "BO3 Practice Tool.exe") {
+                // The running exe can't be overwritten, only renamed. Extract the new exe under a temporary
+                // name first and only swap once it's really there, so a failed download/extract (or an
+                // antivirus removing the new exe) never leaves the folder without "BO3 Practice Tool.exe"
+                // (that's what broke desktop shortcuts).
+                const std::filesystem::path newExe = output_directory / "BO3 Practice Tool.new.exe";
+                const std::filesystem::path oldExe = output_directory / "BO3 Practice Tool.old.exe";
+                std::filesystem::remove(newExe, ec);
+                if (!mz_zip_reader_extract_to_file(&zip_archive, i, newExe.string().c_str(), 0) || !std::filesystem::exists(newExe)) {
+                    WLog::Log(WMT::Error, "Failed to extract the new exe (check your antivirus)");
+                    std::filesystem::remove(newExe, ec);
+                    mz_zip_reader_end(&zip_archive);
+                    return false;
+                }
+                if (std::filesystem::exists(output_file_path)) {
+                    std::filesystem::remove(oldExe, ec);
+                    std::filesystem::rename(output_file_path, oldExe, ec);
+                    if (ec) {
+                        WLog::Log(WMT::Error, "Couldn't move the running exe aside: " + ec.message());
+                        std::filesystem::remove(newExe, ec);
+                        mz_zip_reader_end(&zip_archive);
+                        return false;
+                    }
+                }
+                std::filesystem::rename(newExe, output_file_path, ec);
+                if (ec || !std::filesystem::exists(output_file_path)) {
+                    WLog::Log(WMT::Error, "Couldn't put the new exe in place: " + ec.message());
+                    std::error_code ec2;
+                    // put the old one back so the tool (and any shortcut to it) still works
+                    std::filesystem::rename(oldExe, output_file_path, ec2);
+                    mz_zip_reader_end(&zip_archive);
+                    return false;
+                }
+                ptexe = std::filesystem::absolute(output_file_path).string();
+                continue;
             }
-            else if (std::filesystem::exists(output_file_path)) {
+            if (std::filesystem::exists(output_file_path)) {
                 std::filesystem::remove(output_file_path, ec);
             }
             if (!mz_zip_reader_extract_to_file(&zip_archive, i, output_file_path.string().c_str(), 0)) {
@@ -623,8 +1068,9 @@ namespace BO3PT
         if (!ptexe.empty()) {
             STARTUPINFOA startupInfo = { sizeof(startupInfo) };
             PROCESS_INFORMATION processInfo = { 0 };
-            LPSTR args = &ptexe[0];
-            if (!CreateProcessA(NULL, args, NULL, NULL, TRUE, NULL, NULL, NULL, &startupInfo, &processInfo)) {
+            std::string cmdLine = "\"" + ptexe + "\"";
+            const std::string exeDir = std::filesystem::path(ptexe).parent_path().string();
+            if (!CreateProcessA(NULL, &cmdLine[0], NULL, NULL, TRUE, NULL, NULL, exeDir.c_str(), &startupInfo, &processInfo)) {
                 WLog::Log(WMT::Error, "Failed to start new practice tool exe");
             }
             CloseHandle(processInfo.hProcess);

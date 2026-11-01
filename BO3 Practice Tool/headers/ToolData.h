@@ -99,6 +99,7 @@ namespace BO3PT
 	void WritePracticePatches();
 	void NotifyGame(const std::vector<int>& passList);
 	void InjectTool(bool enable);
+	void WriteSessionHashes(int gameBuild, bool newSession); // hashes for session_hashes.gsc (Settings\Session Hashes.txt)
 	void ResetToggles();
 
 	bool DoesPathExist(std::string_view s);

@@ -215,6 +215,8 @@ RunBoxHits()
     counter.y = -130;
     counter.label = &"^3Box Hits: ^2";
     counter SetValue(0);
+    // fades in with the game (the black screen fades in over 1.5 seconds starting now)
+    counter FadeOverTime(1.5);
     counter.alpha = 1;
     while(!IsDefined(level.chests)) wait 0.05;
     foreach(chest in level.chests) chest thread WatchBoxHits(counter);

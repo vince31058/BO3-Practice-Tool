@@ -42,6 +42,9 @@ namespace BO3PT
 	// When changing a hotkey, modify the keybindBuilder json object with the updated keybind, then call RemoveDuplicates() which will update the json data and keybind call data
 
 	inline bool globalHotKeys = false;
+	// In Game hotkeys (Godmode, End Round, ...) are switched off for now along with their Settings page;
+	// their saved keys stay in bindings.json. Set to true (and add "Settings" back to the sidebar) to bring them back.
+	inline constexpr bool inGameHotkeysEnabled = false;
 	inline bool registerHotKey = false;
 	inline std::string jsonKeyToAssign;
 	inline std::pair<const std::string, HotKeyBind>* hotkeyToAssign = nullptr;

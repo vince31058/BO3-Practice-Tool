@@ -12,6 +12,7 @@ namespace BO3PT
 	inline std::string currentMap = "";
 	inline std::string bo3Directory;
 	inline std::string selfDirectory;
+	inline std::string appVersion;       // internalVersion, for the in-game session hashes
 	inline std::string toolDownloadURL;
 	inline std::string compilerDownloadURL;
 

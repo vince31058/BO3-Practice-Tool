@@ -41,7 +41,8 @@ CustomSoftPatchGums()
     pack = [];
     for(i = 1; i <= 5; i++)
     {
-        num = compiler::readsettings(file, slot * 5 + i, -1);
+        // last argument 0: anything else makes readsettings delete values from the file as it reads
+        num = compiler::readsettings(file, slot * 5 + i, 0);
         if(num < 0 || num >= level.custom_bgb_list.size) return undefined;
         gum = level.custom_bgb_list[num];
         if(IsInArray(pack, gum)) return undefined;

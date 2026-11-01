@@ -169,3 +169,21 @@ The tool now injects into both the downpatched BlackOps3.exe (March 2023) and th
 ### Fixes
 - **Moon Egg End** could split about a minute after the rockets started rising instead of when the Earth explodes (in runs where the egg was done before the second Samantha Says). It now always lands on the explosion.
 - **Moon "Vril Sphere" split** now splits when the sphere reaches the pyramid (it was splitting when the vril generator finished charging).
+
+## v1.7.0
+
+The version number jumps from 1.1.1 to 1.7.0 so the middle number counts every feature update the tool has had.
+
+### New
+- **Session hashes and anti-splice code** (shown whenever the tool is on):
+  - At the start of every attempt (map load or fast restart), the top left shows for 10 seconds: the tool's script hash and version, the game version, any loaded mod or custom map with its hash ("stock" for normal maps), and a session ID that's new every attempt.
+  - The bottom left corner always shows a `PT` code that changes every second, so a run's footage can be checked for splices.
+  - The app also writes `Session Hashes (full).txt` with the full hashes, so known-good values can be published.
+
+### Changes
+- Removed the **Settings** page (In Game keybinds) from Frontend, and turned off the In Game hotkeys (Godmode, End Round, etc.). Your saved keys are kept for when they come back.
+
+### Fixes
+- **Updater:** an update can no longer leave the tool folder without its exe (which broke desktop shortcuts and could open to a black screen). The new version is only swapped in once it's fully in place, and the old one is restored if anything goes wrong.
+- The tool now always finds its files when opened from a shortcut, even if the shortcut's "Start in" folder is somewhere else.
+- Fixed the Soft Patch Gums setting slowly losing saved values.

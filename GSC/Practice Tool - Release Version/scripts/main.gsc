@@ -27,6 +27,9 @@ on_player_connect()
 
     WaitFadeIn();
 
+    // Hash flash + bottom left anti-splice code, every game start (session_hashes.gsc)
+    level thread PtSessionStart();
+
     message = hud::createserverfontstring("big", 1.1);
     message hud::setpoint("TOP", "TOP", 0, 0);
     message SetText("BO3 Practice Tool Loaded: ^6github.com/vince31058/BO3-Practice-Tool");
