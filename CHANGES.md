@@ -187,3 +187,7 @@ The version number jumps from 1.1.1 to 1.7.0 so the middle number counts every f
 - **Updater:** an update can no longer leave the tool folder without its exe (which broke desktop shortcuts and could open to a black screen). The new version is only swapped in once it's fully in place, and the old one is restored if anything goes wrong.
 - The tool now always finds its files when opened from a shortcut, even if the shortcut's "Start in" folder is somewhere else.
 - Fixed the Soft Patch Gums setting slowly losing saved values.
+
+### Known issues
+- **Wisp 2 Practice and Keeper Practice (Der Eisendrache):** charged Lightning Bow shots can crash the game. Both patches show a warning when you return from the past. A rework is planned.
+- In Keeper Practice, the Ragnarok piece and the gold rod sometimes won't pick up the normal way. Pressing use near them still picks them up.

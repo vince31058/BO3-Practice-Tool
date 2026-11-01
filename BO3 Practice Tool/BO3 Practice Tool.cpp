@@ -92,12 +92,12 @@ static ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_N
 static ImGuiWindowFlags dockFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoScrollbar;
 static ImGuiViewport* viewport;
 
-static MSSelection sidebarSelections({ {{ "Player Loadouts", "Autosplits", "Practice Patches", "Soft Patch Gums", "Settings" }}, {{ "Player Options", "Zombie Options", "Egg Step Options", "Craftable Options", "Blocker Options" }},
+static MSSelection sidebarSelections({ {{ "Player Loadouts", "Autosplits", "Practice Patches", "Soft Patch Gums" }}, {{ "Player Options", "Zombie Options", "Egg Step Options", "Craftable Options", "Blocker Options" }},
         {{ "Zombie Calculator", "Code Guides", "GK Valve Solver", "DE Wisp Trainer" }}, {{ "Moon Men", "Appearance", "Install Location", "Credits" }} });
 static MSSelection weaponSelections;
 static std::vector<MSSelection> autosplitSelections;
 
-static std::string internalVersion = "1.1.1"; // major.addition.fix: new feature -> middle number (+ reset the last), fix/small change -> last number. Release tag is v + this
+static std::string internalVersion = "1.7.0"; // major.addition.fix: new feature -> middle number (+ reset the last), fix/small change -> last number. Release tag is v + this
 static Walnut::Image* discordIcon;
 static Walnut::Image* weaponWarning;
 
@@ -149,6 +149,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
         WLog::InitLogger(selfDirectory + "/log.txt");
 		WLog::Log(WMT::Success, "Practice Tool Startup");
+		appVersion = internalVersion;
 
 		Walnut::Application* app = Walnut::CreateApplication(__argc, __argv);
 		app->Run();
@@ -619,6 +620,11 @@ public:
             // round back to 0) clears the last run's valves
             if (currentMap == "zm_stalingrad" && (prevMap != currentMap || (!MemState::GetRoundValue() && prevRound))) {
                 ResetValveSolver();
+            }
+
+            // a map is loading: refresh the session hashes if a mod was rebuilt / installed (rewrites only on a change)
+            if (currentMap != prevMap && currentMap.substr(0, 2) == "zm" && GUIState::IsStateSet(Active)) {
+                std::thread(WriteSessionHashes, static_cast<int>(MemState::GetBuild()), false).detach();
             }
 
             if (currentMap != prevMap && currentMap.substr(0, 2) == "zm") {
@@ -5290,13 +5296,13 @@ RenderWindow SidebarToWindow(int sidebarIndex)
     case 1: return Autosplits;
     case 2: return PracticePatches;
     case 3: return SoftPatchGums;
-    case 4: return Settings;
+    // "Settings" (In Game Keybinds) is off the sidebar for now; SettingsFunc is kept to bring it back
     default: {
         // In Game, Resources and Practice Tool pages (Round Options is a tab in Zombie Options and
         // Powerup Options a tab in Player Options, so they have no sidebar entry)
         static const RenderWindow pages[] = { PlayerOptions, ZombieOptions, EggStepOptions, CraftableOptions, BlockerOptions,
             ZombieCalculator, CodeGuides, GKValveSolver, WispTrainer, MoonMen, ToolSettings, InstallLocation, Credits };
-        int page = sidebarIndex - 5;
+        int page = sidebarIndex - 4;
         if (page < 0 || page >= static_cast<int>(sizeof(pages) / sizeof(pages[0]))) return PlayerOptions;
         return pages[page];
     }
